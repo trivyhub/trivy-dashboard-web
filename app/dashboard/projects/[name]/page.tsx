@@ -439,6 +439,120 @@ export default function ProjectDetailPage() {
           )}
         </Spotlight>
 
+        {/* Severity breakdown */}
+        <Spotlight style={{ gridColumn: "span 4" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <span style={{ fontSize: 13, color: "var(--fg-muted)", fontWeight: 500 }}>Répartition par sévérité</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-dim)" }}>{vulns.length} total</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {([
+              { label: "Critical", v: vulns.filter(x => x.severity === "CRITICAL").length, color: "oklch(0.65 0.24 22)" },
+              { label: "High",     v: vulns.filter(x => x.severity === "HIGH").length,     color: "oklch(0.72 0.18 50)" },
+              { label: "Medium",   v: vulns.filter(x => x.severity === "MEDIUM").length,   color: "oklch(0.82 0.16 90)" },
+              { label: "Low",      v: vulns.filter(x => x.severity === "LOW").length,       color: "oklch(0.70 0.14 245)" },
+            ]).map(s => {
+              const pct = vulns.length ? (s.v / vulns.length) * 100 : 0;
+              return (
+                <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, display: "inline-block" }}/>
+                      {s.label}
+                    </div>
+                    <span style={{ fontFamily: "var(--font-mono)" }}>
+                      {s.v} <span style={{ color: "var(--fg-faint)" }}>· {pct.toFixed(0)}%</span>
+                    </span>
+                  </div>
+                  <div style={{ height: 5, background: "var(--surface-3)", borderRadius: 999, overflow: "hidden" }}>
+                    <div style={{ width: `${pct}%`, height: "100%", background: s.color, transition: "width 600ms cubic-bezier(0.2,0.7,0.2,1)" }}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ height: 1, background: "var(--border)", margin: "16px 0" }}/>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <div>
+              <div style={{ color: "var(--fg-dim)", fontSize: 11 }}>CVSS moyen</div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 18, fontWeight: 600, marginTop: 4 }}>
+                {(() => {
+                  const withScore = vulns.filter(v => v.cvss_score != null);
+                  if (!withScore.length) return <span style={{ color: "var(--fg-faint)" }}>—</span>;
+                  const avg = withScore.reduce((s, v) => s + v.cvss_score!, 0) / withScore.length;
+                  const color = avg >= 9 ? "var(--sev-critical)" : avg >= 7 ? "var(--sev-high)" : avg >= 4 ? "var(--sev-medium)" : "var(--sev-low)";
+                  return <span style={{ color }}>{avg.toFixed(1)}</span>;
+                })()}
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: "var(--fg-dim)", fontSize: 11 }}>Avec fix dispo</div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 18, fontWeight: 600, marginTop: 4, color: "var(--accent)" }}>
+                {vulns.filter(v => v.fixed_version).length}
+                <span style={{ fontSize: 11, color: "var(--fg-faint)", fontWeight: 400 }}> / {vulns.length}</span>
+              </div>
+            </div>
+          </div>
+        </Spotlight>
+
+        {/* Top CVEs by CVSS */}
+        <Spotlight style={{ gridColumn: "span 8" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <span style={{ fontSize: 13, color: "var(--fg-muted)", fontWeight: 500 }}>Top vulnérabilités · CVSS</span>
+            <span style={{ fontSize: 11, color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}>scan #{activeScan?.id ?? "—"}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {vulns.length === 0 ? (
+              <div style={{ padding: "24px 0", textAlign: "center", color: "var(--fg-dim)", fontSize: 13 }}>Aucune vulnérabilité</div>
+            ) : [...vulns]
+                .sort((a, b) => {
+                  if (b.cvss_score != null && a.cvss_score != null) return b.cvss_score - a.cvss_score;
+                  const ord: Record<string,number> = { CRITICAL:4, HIGH:3, MEDIUM:2, LOW:1 };
+                  return (ord[b.severity]??0) - (ord[a.severity]??0);
+                })
+                .slice(0, 8)
+                .map(v => (
+                  <div key={v.id}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 8px", borderRadius: 8, transition: "background 140ms ease", cursor: "default" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2)")}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >
+                    {/* CVSS gauge */}
+                    {v.cvss_score != null ? (
+                      <div style={{
+                        width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+                        background: `conic-gradient(${v.cvss_score >= 9 ? "var(--sev-critical)" : v.cvss_score >= 7 ? "var(--sev-high)" : v.cvss_score >= 4 ? "var(--sev-medium)" : "var(--sev-low)"} ${(v.cvss_score/10)*100}%, var(--surface-3) 0)`,
+                        display: "grid", placeItems: "center", position: "relative",
+                      }}>
+                        <div style={{ position: "absolute", inset: 5, borderRadius: "50%", background: "var(--surface)" }}/>
+                        <span style={{ position: "relative", fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, color: v.cvss_score >= 9 ? "var(--sev-critical)" : v.cvss_score >= 7 ? "var(--sev-high)" : v.cvss_score >= 4 ? "var(--sev-medium)" : "var(--sev-low)" }}>
+                          {v.cvss_score.toFixed(1)}
+                        </span>
+                      </div>
+                    ) : (
+                      <SevChip level={v.severity}/>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--fg)", fontWeight: 600 }}>{v.cve_id}</span>
+                        <SevChip level={v.severity}/>
+                        {v.fixed_version && (
+                          <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "oklch(0.86 0.18 130 / 0.10)", color: "var(--accent)", fontFamily: "var(--font-mono)" }}>fix dispo</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "var(--fg-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: 2 }}>
+                        {v.title || v.package_name}
+                      </div>
+                    </div>
+                    <div style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-faint)", flexShrink: 0 }}>
+                      {v.package_name}@{v.installed_version}
+                    </div>
+                  </div>
+                ))
+            }
+          </div>
+        </Spotlight>
+
         {/* Vulnerabilities */}
         <div style={{ gridColumn: "span 12", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid var(--border)" }}>
