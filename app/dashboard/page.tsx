@@ -6,7 +6,7 @@ import { projectsApi, vulnApi } from "@/lib/api";
 import type { Project, Vulnerability, ScanSummary } from "@/lib/types";
 import { format, subDays } from "date-fns";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from "recharts";
 
@@ -96,64 +96,39 @@ const SEV_CSS: Record<string, string> = {
 
 function EvoTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
-  // Read raw values (_low, _medium, etc.) — not the pre-stacked visual values
-  const raw = payload[0]?.payload ?? {};
-  const rows = [
-    { k: "critical", label: "Critical", val: raw._critical ?? 0 },
-    { k: "high",     label: "High",     val: raw._high     ?? 0 },
-    { k: "medium",   label: "Medium",   val: raw._medium   ?? 0 },
-    { k: "low",      label: "Low",      val: raw._low      ?? 0 },
-  ];
-  const total = rows.reduce((s, r) => s + r.val, 0);
   return (
     <div style={{
       background: "#111114", border: "1px solid rgba(255,255,255,0.10)",
       borderRadius: 8, padding: "10px 14px",
       fontSize: 11, fontFamily: "var(--font-mono)",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.6)", minWidth: 140,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.6)", minWidth: 130,
     }}>
       <div style={{ color: "#71717a", marginBottom: 8, fontSize: 10, letterSpacing: "0.05em" }}>{label}</div>
-      {rows.map(({ k, label: name, val }) => (
-        <div key={k} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: SEV_CSS[k], display: "inline-block", flexShrink: 0 }}/>
-          <span style={{ flex: 1, color: "#a1a1aa" }}>{name}</span>
-          <span style={{ color: val > 0 ? SEV_CSS[k] : "#52525b", fontWeight: val > 0 ? 700 : 400 }}>{val}</span>
+      {payload.map((p: any) => (
+        <div key={p.dataKey} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: p.color, display: "inline-block", flexShrink: 0 }}/>
+          <span style={{ flex: 1, color: "#a1a1aa" }}>{p.name}</span>
+          <span style={{ color: p.value > 0 ? p.color : "#52525b", fontWeight: p.value > 0 ? 700 : 400 }}>{p.value}</span>
         </div>
       ))}
-      {total > 0 && <>
-        <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "8px 0" }}/>
-        <div style={{ display: "flex", justifyContent: "space-between", color: "#a1a1aa" }}>
-          <span>Total</span><span style={{ fontWeight: 700, color: "#fafafa" }}>{total}</span>
-        </div>
-      </>}
     </div>
   );
 }
 
 function EvoChart({ data, height = 220 }: { data: Record<string, any>[]; height?: number }) {
-  const maxTotal = Math.max(...data.map(d => d.critical ?? 0), 1);
+  const maxVal = Math.max(...data.map(d => Math.max(d.critical, d.high, d.medium)), 1);
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
-        <defs>
-          {(["critical","high","medium","low"] as const).map(k => (
-            <linearGradient key={k} id={`eg-${k}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={SEV_CSS[k]} stopOpacity={0.6}/>
-              <stop offset="100%" stopColor={SEV_CSS[k]} stopOpacity={0.08}/>
-            </linearGradient>
-          ))}
-        </defs>
+      <LineChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
         <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3"/>
         <XAxis dataKey="date" tick={{ fill: "#52525b", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
-        <YAxis domain={[0, maxTotal]} tick={{ fill: "#52525b", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} width={32} allowDecimals={false}/>
+        <YAxis domain={[0, maxVal + 2]} tick={{ fill: "#52525b", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} width={32} allowDecimals={false}/>
         <Tooltip content={<EvoTooltip/>} cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }}/>
-        {/* Draw from bottom up: low first (smallest stack), critical last (top) */}
-        <Area type="monotone" dataKey="low"      stroke={SEV_CSS.low}      strokeWidth={1.5} fill={`url(#eg-low)`}      dot={false} isAnimationActive={false} activeDot={{ r: 3, fill: SEV_CSS.low }}/>
-        <Area type="monotone" dataKey="medium"   stroke={SEV_CSS.medium}   strokeWidth={1.5} fill={`url(#eg-medium)`}   dot={false} isAnimationActive={false} activeDot={{ r: 3, fill: SEV_CSS.medium }}/>
-        <Area type="monotone" dataKey="high"     stroke={SEV_CSS.high}     strokeWidth={1.5} fill={`url(#eg-high)`}     dot={false} isAnimationActive={false} activeDot={{ r: 3, fill: SEV_CSS.high }}/>
-        <Area type="monotone" dataKey="critical" stroke={SEV_CSS.critical} strokeWidth={1.5} fill={`url(#eg-critical)`} dot={false} isAnimationActive={false} activeDot={{ r: 3, fill: SEV_CSS.critical }}/>
-      </AreaChart>
+        <Line type="monotone" dataKey="critical" name="Critical" stroke={SEV_CSS.critical} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: SEV_CSS.critical }} isAnimationActive={false}/>
+        <Line type="monotone" dataKey="high"     name="High"     stroke={SEV_CSS.high}     strokeWidth={2} dot={false} activeDot={{ r: 4, fill: SEV_CSS.high }}     isAnimationActive={false}/>
+        <Line type="monotone" dataKey="medium"   name="Medium"   stroke={SEV_CSS.medium}   strokeWidth={2} dot={false} activeDot={{ r: 4, fill: SEV_CSS.medium }}   isAnimationActive={false}/>
+      </LineChart>
     </ResponsiveContainer>
   );
 }
@@ -241,20 +216,11 @@ function buildEvoData(allScans: ScanSummary[]) {
       scanIdx++;
     }
     const vals = Object.values(lastKnown);
-    const low      = vals.reduce((s, v) => s + v.low, 0);
-    const medium   = vals.reduce((s, v) => s + v.medium, 0);
-    const high     = vals.reduce((s, v) => s + v.high, 0);
-    const critical = vals.reduce((s, v) => s + v.critical, 0);
-    // Pre-stack: each series stores its cumulative top so Area without stackId draws correctly
     return {
       date: format(day, "MMM d"),
-      // raw values for tooltip
-      _low: low, _medium: medium, _high: high, _critical: critical,
-      // stacked tops for visual areas
-      low,
-      medium:   low + medium,
-      high:     low + medium + high,
-      critical: low + medium + high + critical,
+      critical: vals.reduce((s, v) => s + v.critical, 0),
+      high:     vals.reduce((s, v) => s + v.high, 0),
+      medium:   vals.reduce((s, v) => s + v.medium, 0),
     };
   });
 }
@@ -393,9 +359,9 @@ export default function OverviewPage() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 14 }}>
-              {(["critical","high","medium","low"] as const).map(k => (
+              {(["critical","high","medium"] as const).map(k => (
                 <div key={k} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--fg-muted)" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: SEV_CSS[k], display: "inline-block" }}/>
+                  <span style={{ width: 16, height: 2, borderRadius: 999, background: SEV_CSS[k], display: "inline-block" }}/>
                   <span style={{ fontFamily: "var(--font-mono)", textTransform: "capitalize" }}>{k}</span>
                 </div>
               ))}
