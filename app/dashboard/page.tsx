@@ -133,7 +133,6 @@ function EvoTooltip({ active, payload, label }: any) {
 }
 
 function EvoChart({ data, height = 220 }: { data: Record<string, any>[]; height?: number }) {
-  // Compute max of stacked totals so YAxis domain is correct
   const maxTotal = Math.max(...data.map(d =>
     (d.critical ?? 0) + (d.high ?? 0) + (d.medium ?? 0) + (d.low ?? 0)
   ), 1);
@@ -141,14 +140,6 @@ function EvoChart({ data, height = 220 }: { data: Record<string, any>[]; height?
   return (
     <ResponsiveContainer width="100%" height={height}>
       <AreaChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
-        <defs>
-          {(["critical","high","medium","low"] as const).map(k => (
-            <linearGradient key={k} id={`evo-${k}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={SEV_CSS[k]} stopOpacity={0.7}/>
-              <stop offset="100%" stopColor={SEV_CSS[k]} stopOpacity={0.2}/>
-            </linearGradient>
-          ))}
-        </defs>
         <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3"/>
         <XAxis
           dataKey="date"
@@ -164,11 +155,16 @@ function EvoChart({ data, height = 220 }: { data: Record<string, any>[]; height?
           allowDecimals={false}
         />
         <Tooltip content={<EvoTooltip/>} cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }}/>
-        {/* Stack order: low at bottom, critical on top */}
-        <Area type="monotone" dataKey="low"      name="Low"      stackId="s" stroke={SEV_CSS.low}      strokeWidth={1.5} fill={`url(#evo-low)`}/>
-        <Area type="monotone" dataKey="medium"   name="Medium"   stackId="s" stroke={SEV_CSS.medium}   strokeWidth={1.5} fill={`url(#evo-medium)`}/>
-        <Area type="monotone" dataKey="high"     name="High"     stackId="s" stroke={SEV_CSS.high}     strokeWidth={1.5} fill={`url(#evo-high)`}/>
-        <Area type="monotone" dataKey="critical" name="Critical" stackId="s" stroke={SEV_CSS.critical} strokeWidth={1.5} fill={`url(#evo-critical)`}/>
+        <Area type="monotone" dataKey="low"      name="Low"      stackId="s" stroke={SEV_CSS.low}      strokeWidth={1.5} fill={SEV_CSS.low}      fillOpacity={0.30} isAnimationActive={false}/>
+        <Area type="monotone" dataKey="medium"   name="Medium"   stackId="s" stroke={SEV_CSS.medium}   strokeWidth={1.5} fill={SEV_CSS.medium}   fillOpacity={0.40} isAnimationActive={false}/>
+        <Area type="monotone" dataKey="high"     name="High"     stackId="s" stroke={SEV_CSS.high}     strokeWidth={1.5} fill={SEV_CSS.high}     fillOpacity={0.50} isAnimationActive={false}/>
+        <Area type="monotone" dataKey="critical" name="Critical" stackId="s"
+          stroke={data.some(d => d.critical > 0) ? SEV_CSS.critical : "transparent"}
+          strokeWidth={1.5}
+          fill={SEV_CSS.critical}
+          fillOpacity={data.some(d => d.critical > 0) ? 0.60 : 0}
+          isAnimationActive={false}
+        />
       </AreaChart>
     </ResponsiveContainer>
   );
