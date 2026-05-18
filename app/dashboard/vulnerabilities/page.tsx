@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { vulnApi } from "@/lib/api";
-import type { Vulnerability, Severity } from "@/lib/types";
-import { Search, Download, ExternalLink } from "lucide-react";
+import { vulnApi, projectsApi } from "@/lib/api";
+import type { Vulnerability, Severity, Project } from "@/lib/types";
+import { Search, Download, ExternalLink, ChevronDown } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { exportVulnsCSV } from "@/lib/export";
 
@@ -47,18 +47,19 @@ export default function VulnerabilitiesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sevFilter, setSevFilter] = useState<Severity | "ALL">("ALL");
-  const [fixedFilter, setFixedFilter] = useState<"ALL" | "FIXED" | "UNFIXED">("UNFIXED");
+  const [projectFilter, setProjectFilter] = useState("");
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  useEffect(() => { projectsApi.list().then(p => setProjects(p ?? [])); }, []);
 
   useEffect(() => {
     setLoading(true);
-    vulnApi.list(page, 100, sevFilter === "ALL" ? "" : sevFilter)
+    vulnApi.list(page, 100, sevFilter === "ALL" ? "" : sevFilter, projectFilter)
       .then(v => { setVulns(v?.data ?? []); setTotal(v?.total ?? 0); })
       .finally(() => setLoading(false));
-  }, [page, sevFilter]);
+  }, [page, sevFilter, projectFilter]);
 
   const filtered = vulns.filter(v => {
-    if (fixedFilter === "FIXED" && !v.is_fixed) return false;
-    if (fixedFilter === "UNFIXED" && v.is_fixed) return false;
     const q = search.toLowerCase();
     return !q || v.cve_id.toLowerCase().includes(q) || v.package_name.toLowerCase().includes(q) || (v.title ?? "").toLowerCase().includes(q);
   });
@@ -116,37 +117,49 @@ export default function VulnerabilitiesPage() {
         })}
       </div>
 
-      {/* Search + status filter */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
+      {/* Search + project filter */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+        {/* Search */}
         <div style={{ position: "relative", flex: 1, maxWidth: 360 }}>
           <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--fg-faint)", pointerEvents: "none" }}/>
           <input
             type="text" value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search CVE, package, title…"
+            placeholder="Rechercher CVE, package, titre…"
             style={{
               width: "100%", paddingLeft: 32, paddingRight: 12, paddingTop: 7, paddingBottom: 7,
               background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8,
-              fontSize: 13, color: "var(--fg)", outline: "none",
-              transition: "border-color 160ms ease",
+              fontSize: 13, color: "var(--fg)", outline: "none", transition: "border-color 160ms ease",
             }}
             onFocus={e => (e.target.style.borderColor = "var(--accent-dim)")}
             onBlur={e => (e.target.style.borderColor = "var(--border)")}
           />
         </div>
-        <div style={{ display: "flex", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, padding: 3, gap: 2 }}>
-          {(["ALL", "UNFIXED", "FIXED"] as const).map(f => (
-            <button key={f} onClick={() => setFixedFilter(f)} style={{
-              padding: "5px 10px", borderRadius: 6, fontSize: 12, fontWeight: 500,
-              background: fixedFilter === f ? "var(--surface-3)" : "transparent",
-              color: fixedFilter === f ? "var(--fg)" : "var(--fg-dim)",
-              border: "none", cursor: "pointer", transition: "all 140ms ease",
-            }}>
-              {f === "ALL" ? "All" : f === "UNFIXED" ? "Unfixed" : "Fixed"}
-            </button>
-          ))}
+
+        {/* Project filter */}
+        <div style={{ position: "relative" }}>
+          <select
+            value={projectFilter}
+            onChange={e => { setProjectFilter(e.target.value); setPage(1); }}
+            style={{
+              padding: "7px 32px 7px 12px",
+              background: "var(--surface)", border: `1px solid ${projectFilter ? "var(--accent-dim)" : "var(--border)"}`,
+              borderRadius: 8, fontSize: 13, color: projectFilter ? "var(--fg)" : "var(--fg-muted)",
+              outline: "none", cursor: "pointer", appearance: "none",
+              boxShadow: projectFilter ? "0 0 0 3px oklch(0.86 0.18 130 / 0.12)" : "none",
+              transition: "border-color 160ms ease",
+            }}
+          >
+            <option value="">Tous les projets</option>
+            {projects.map(p => (
+              <option key={p.id} value={p.name}>{p.name}</option>
+            ))}
+          </select>
+          <ChevronDown size={12} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", color: "var(--fg-faint)", pointerEvents: "none" }}/>
         </div>
+
         <span style={{ fontSize: 12, color: "var(--fg-faint)", fontFamily: "var(--font-mono)" }}>
-          {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+          {total} CVE{total !== 1 ? "s" : ""}
+          {projectFilter && <span style={{ color: "var(--accent)" }}> · {projectFilter}</span>}
         </span>
       </div>
 
@@ -156,7 +169,7 @@ export default function VulnerabilitiesPage() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}>
-                {["CVE ID", "CVSS", "Severity", "Package", "Installed", "Fix", "Title", "Link", "Status", "Age", "First seen"].map(h => (
+                {["CVE ID", "CVSS", "Severity", "Package", "Installed", "Fix", "Title", "Link", "Age", "First seen"].map(h => (
                   <th key={h} style={{
                     textAlign: "left", padding: "11px 14px",
                     fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em",
@@ -220,11 +233,6 @@ export default function VulnerabilitiesPage() {
                           NVD <ExternalLink size={10}/>
                         </a>
                       : <span style={{ color: "var(--fg-faint)", fontSize: 11 }}>—</span>}
-                  </td>
-                  <td style={{ padding: "12px 14px" }}>
-                    {v.is_fixed
-                      ? <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "oklch(0.86 0.18 130 / 0.12)", color: "var(--accent)", fontFamily: "var(--font-mono)" }}>Fixed</span>
-                      : <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "oklch(0.65 0.24 22 / 0.10)", color: "var(--sev-critical)", fontFamily: "var(--font-mono)" }}>Open</span>}
                   </td>
                   <td style={{ padding: "12px 14px" }}>
                     <AgeBadge date={v.first_seen_at} severity={v.severity}/>

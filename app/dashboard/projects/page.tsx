@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { projectsApi } from "@/lib/api";
 import type { Project } from "@/lib/types";
-import { Search, LayoutGrid, List, Plus, GitBranch, Clock, ChevronRight } from "lucide-react";
+import { Search, LayoutGrid, List, GitBranch, Clock, ChevronRight } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -308,17 +308,6 @@ export default function ProjectsPage() {
               </button>
             ))}
           </div>
-          {/* New project */}
-          <button style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-            background: "linear-gradient(180deg, oklch(0.92 0.16 130), oklch(0.78 0.18 130))",
-            color: "#08080b", border: "none", cursor: "pointer",
-            boxShadow: "0 0 0 1px oklch(0.78 0.18 130), 0 8px 24px -8px var(--accent-glow)",
-            fontFamily: "var(--font-sans)",
-          }}>
-            <Plus size={14}/> Nouveau projet
-          </button>
         </div>
       </div>
 
@@ -331,25 +320,6 @@ export default function ProjectsPage() {
               ))
             : filtered.map(p => <ProjectCard key={p.id} project={p}/>)
           }
-          {/* Add project card */}
-          {!loading && (
-            <div style={{
-              border: "1px dashed var(--border-strong)", borderRadius: 14,
-              display: "grid", placeItems: "center", minHeight: 280,
-              color: "var(--fg-dim)", cursor: "pointer", transition: "all 160ms ease",
-            }}
-            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--accent-dim)"; (e.currentTarget as HTMLElement).style.color = "var(--fg)"; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = "var(--border-strong)"; (e.currentTarget as HTMLElement).style.color = "var(--fg-dim)"; }}
-            >
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 10, border: "1px solid var(--border-strong)", display: "grid", placeItems: "center" }}>
-                  <Plus size={18}/>
-                </div>
-                <div style={{ fontSize: 13 }}>Connecter un nouveau dépôt</div>
-                <div style={{ fontSize: 11, color: "var(--fg-faint)" }}>GitHub · GitLab · Bitbucket</div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
