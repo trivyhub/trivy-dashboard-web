@@ -6,7 +6,7 @@ import { projectsApi, vulnApi } from "@/lib/api";
 import type { Project, Vulnerability, ScanSummary } from "@/lib/types";
 import { format, subDays } from "date-fns";
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from "recharts";
 
@@ -96,13 +96,9 @@ const SEV_CSS: Record<string, string> = {
 
 function EvoTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
-  // payload[i].value is the stacked cumulative — use payload[i].payload[dataKey] for raw value
-  const items = [...payload].reverse().map((p: any) => ({
-    name: p.name,
-    color: p.color,
-    value: p.payload?.[p.dataKey] ?? p.value,
-  }));
-  const total = items.reduce((s, i) => s + i.value, 0);
+  // With stacked bars, payload[i].value is the RAW value for that bar segment — correct by default
+  const items = [...payload].reverse().filter(p => p.value > 0);
+  const total = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
   return (
     <div style={{
       background: "#111114", border: "1px solid rgba(255,255,255,0.10)",
@@ -112,13 +108,17 @@ function EvoTooltip({ active, payload, label }: any) {
       minWidth: 140,
     }}>
       <div style={{ color: "#71717a", marginBottom: 8, fontSize: 10, letterSpacing: "0.05em" }}>{label}</div>
-      {items.map(item => (
-        <div key={item.name} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: item.color, display: "inline-block", flexShrink: 0 }}/>
-          <span style={{ flex: 1, color: "#a1a1aa" }}>{item.name}</span>
-          <span style={{ color: item.color, fontWeight: 700 }}>{item.value}</span>
-        </div>
-      ))}
+      {(["critical","high","medium","low"] as const).map(k => {
+        const p = payload.find((x: any) => x.dataKey === k);
+        const val = p?.value ?? 0;
+        return (
+          <div key={k} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: SEV_CSS[k], display: "inline-block", flexShrink: 0 }}/>
+            <span style={{ flex: 1, color: "#a1a1aa", textTransform: "capitalize" }}>{k}</span>
+            <span style={{ color: val > 0 ? SEV_CSS[k] : "#52525b", fontWeight: val > 0 ? 700 : 400 }}>{val}</span>
+          </div>
+        );
+      })}
       {total > 0 && (
         <>
           <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "8px 0" }}/>
@@ -139,7 +139,7 @@ function EvoChart({ data, height = 220 }: { data: Record<string, any>[]; height?
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
+      <BarChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }} barCategoryGap="20%">
         <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3"/>
         <XAxis
           dataKey="date"
@@ -154,18 +154,12 @@ function EvoChart({ data, height = 220 }: { data: Record<string, any>[]; height?
           width={32}
           allowDecimals={false}
         />
-        <Tooltip content={<EvoTooltip/>} cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }}/>
-        <Area type="monotone" dataKey="low"      name="Low"      stackId="s" stroke={SEV_CSS.low}      strokeWidth={1.5} fill={SEV_CSS.low}      fillOpacity={0.30} isAnimationActive={false}/>
-        <Area type="monotone" dataKey="medium"   name="Medium"   stackId="s" stroke={SEV_CSS.medium}   strokeWidth={1.5} fill={SEV_CSS.medium}   fillOpacity={0.40} isAnimationActive={false}/>
-        <Area type="monotone" dataKey="high"     name="High"     stackId="s" stroke={SEV_CSS.high}     strokeWidth={1.5} fill={SEV_CSS.high}     fillOpacity={0.50} isAnimationActive={false}/>
-        <Area type="monotone" dataKey="critical" name="Critical" stackId="s"
-          stroke={data.some(d => d.critical > 0) ? SEV_CSS.critical : "transparent"}
-          strokeWidth={1.5}
-          fill={SEV_CSS.critical}
-          fillOpacity={data.some(d => d.critical > 0) ? 0.60 : 0}
-          isAnimationActive={false}
-        />
-      </AreaChart>
+        <Tooltip content={<EvoTooltip/>} cursor={{ fill: "rgba(255,255,255,0.04)" }}/>
+        <Bar dataKey="low"      name="Low"      stackId="s" fill={SEV_CSS.low}      fillOpacity={0.85} isAnimationActive={false}/>
+        <Bar dataKey="medium"   name="Medium"   stackId="s" fill={SEV_CSS.medium}   fillOpacity={0.85} isAnimationActive={false}/>
+        <Bar dataKey="high"     name="High"     stackId="s" fill={SEV_CSS.high}     fillOpacity={0.85} isAnimationActive={false}/>
+        <Bar dataKey="critical" name="Critical" stackId="s" fill={SEV_CSS.critical} fillOpacity={0.85} isAnimationActive={false} radius={[3, 3, 0, 0]}/>
+      </BarChart>
     </ResponsiveContainer>
   );
 }
