@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { RefreshCw, Download, Play, ChevronRight, Copy, Check, GitBranch, ArrowUp } from "lucide-react";
 import { projectsApi, vulnApi } from "@/lib/api";
-import type { Project, Vulnerability } from "@/lib/types";
+import type { Project, Vulnerability, ScanSummary } from "@/lib/types";
 import { format, subDays } from "date-fns";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -206,28 +206,50 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/* ── Build chart data ────────────────────────────────────────── */
+/* ── Build chart data from scans ─────────────────────────────── */
 
-function buildEvoData(vulns: Vulnerability[]) {
-  return Array.from({ length: 14 }, (_, i) => {
-    const date = subDays(new Date(), 13 - i);
-    const dateStr = format(date, "yyyy-MM-dd");
-    const active = vulns.filter(v => v.first_seen_at?.slice(0, 10) === dateStr);
+function buildEvoData(allScans: ScanSummary[]) {
+  // One point per day: take the most recent scan of any project for that day,
+  // or interpolate from the last known scan.
+  const days = Array.from({ length: 14 }, (_, i) => subDays(new Date(), 13 - i));
+
+  // Sort scans oldest→newest
+  const sorted = [...allScans].sort((a, b) =>
+    new Date(a.scanned_at).getTime() - new Date(b.scanned_at).getTime()
+  );
+
+  // For each project, track last known scan counts
+  const lastKnown: Record<number, ScanSummary> = {};
+  let scanIdx = 0;
+
+  return days.map(day => {
+    const dayEnd = format(day, "yyyy-MM-dd");
+
+    // Consume all scans up to end of this day
+    while (scanIdx < sorted.length) {
+      const s = sorted[scanIdx];
+      if (s.scanned_at.slice(0, 10) <= dayEnd) {
+        lastKnown[s.project_id] = s;
+        scanIdx++;
+      } else break;
+    }
+
+    // Sum across all projects with known state
+    const vals = Object.values(lastKnown);
     return {
-      date: format(date, "MMM d"),
-      critical: active.filter(v => v.severity === "CRITICAL").length,
-      high:     active.filter(v => v.severity === "HIGH").length,
-      medium:   active.filter(v => v.severity === "MEDIUM").length,
-      low:      active.filter(v => v.severity === "LOW").length,
+      date: format(day, "MMM d"),
+      critical: vals.reduce((s, v) => s + v.critical, 0),
+      high:     vals.reduce((s, v) => s + v.high, 0),
+      medium:   vals.reduce((s, v) => s + v.medium, 0),
+      low:      vals.reduce((s, v) => s + v.low, 0),
     };
   });
 }
 
 function buildSparkValues(vulns: Vulnerability[], severity: string) {
   return Array.from({ length: 14 }, (_, i) => {
-    const date = subDays(new Date(), 13 - i);
-    const dateStr = format(date, "yyyy-MM-dd");
-    return vulns.filter(v => v.severity === severity && v.first_seen_at?.slice(0, 10) <= dateStr).length;
+    const dateStr = format(subDays(new Date(), 13 - i), "yyyy-MM-dd");
+    return vulns.filter(v => v.severity === severity && (v.first_seen_at?.slice(0, 10) ?? "9999") <= dateStr).length;
   });
 }
 
@@ -236,11 +258,21 @@ function buildSparkValues(vulns: Vulnerability[], severity: string) {
 export default function OverviewPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [vulns, setVulns] = useState<Vulnerability[]>([]);
+  const [allScans, setAllScans] = useState<ScanSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([projectsApi.list(), vulnApi.list(1, 500)])
-      .then(([p, v]) => { setProjects(p ?? []); setVulns(v?.data ?? []); })
+      .then(async ([p, v]) => {
+        const projectList = p ?? [];
+        setProjects(projectList);
+        setVulns(v?.data ?? []);
+        // Load scans for all projects in parallel for the evolution chart
+        const scanArrays = await Promise.all(
+          projectList.map(proj => projectsApi.scans(proj.name).catch(() => []))
+        );
+        setAllScans(scanArrays.flat());
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -251,7 +283,7 @@ export default function OverviewPage() {
   const total    = critical + high + medium + low;
   const unfixed  = vulns.filter(v => !v.is_fixed).length;
 
-  const evoData = buildEvoData(vulns);
+  const evoData = buildEvoData(allScans);
   const sparkCritical = buildSparkValues(vulns, "CRITICAL");
   const sparkHigh     = buildSparkValues(vulns, "HIGH");
   const sparkMedium   = buildSparkValues(vulns, "MEDIUM");
@@ -344,7 +376,7 @@ export default function OverviewPage() {
             <div>
               <div style={{ fontSize: 13, color: "var(--fg-muted)", fontWeight: 500 }}>Vulnerability evolution</div>
               <div style={{ fontSize: 11.5, color: "var(--fg-dim)", marginTop: 2 }}>
-                New detections per day · stacked by severity · last 14 days
+                Active vulnerabilities per project scan · stacked by severity · last 14 days
               </div>
             </div>
             <div style={{ display: "flex", gap: 14 }}>
@@ -358,7 +390,15 @@ export default function OverviewPage() {
           </div>
           {loading
             ? <div style={{ height: 240, background: "var(--surface-2)", borderRadius: 8 }}/>
-            : <EvoChart data={evoData} height={240}/>
+            : allScans.length === 0
+              ? (
+                <div style={{ height: 240, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "var(--fg-dim)", fontSize: 13 }}>
+                  <div style={{ fontSize: 28, opacity: 0.3 }}>📡</div>
+                  <div>No scan data yet</div>
+                  <div style={{ fontSize: 11, color: "var(--fg-faint)", fontFamily: "var(--font-mono)" }}>Push a Trivy report to start tracking evolution</div>
+                </div>
+              )
+              : <EvoChart data={evoData} height={240}/>
           }
         </Spotlight>
 
