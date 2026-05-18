@@ -19,15 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div style={{ minWidth: 0, display: "flex", flexDirection: "column" }}>
         <Topbar />
         <main style={{ flex: 1, overflowY: "auto" }}>
-          <div style={{
-            maxWidth: 1480,
-            width: "100%",
-            margin: "0 auto",
-            padding: "28px 32px",
-            animation: "page-in 320ms cubic-bezier(0.2, 0.7, 0.2, 1)",
-          }}>
-            {children}
-          </div>
+          {children}
         </main>
       </div>
       <CommandPalette />

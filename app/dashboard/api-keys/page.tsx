@@ -2,13 +2,11 @@
 import { useEffect, useState } from "react";
 import { apiKeysApi } from "@/lib/api";
 import type { APIKey } from "@/lib/types";
-import { Card } from "@/components/ui/Card";
-import { TableSkeleton } from "@/components/ui/Skeleton";
 import { Plus, Trash2, Copy, Check, Terminal } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { format } from "date-fns";
 
-function NewKeyModal({ onClose, onCreated }: { onClose: () => void; onCreated: (key: APIKey) => void }) {
+function Modal({ onClose, onCreated }: { onClose: () => void; onCreated: (key: APIKey) => void }) {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,20 +20,27 @@ function NewKeyModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
-      <div className="bg-[#16181f] border border-[#2a2d3a] rounded-xl w-full max-w-md p-6">
-        <h2 className="text-base font-semibold text-[#e8eaf0] mb-4">Create API key</h2>
-        <form onSubmit={submit} className="space-y-4">
-          {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm px-3 py-2 rounded-lg">{error}</div>}
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, backdropFilter: "blur(6px)", animation: "fade-in 160ms ease" }}>
+      <div style={{ width: "min(440px, 92vw)", background: "var(--bg-elev)", border: "1px solid var(--border-strong)", borderRadius: 14, padding: 24, boxShadow: "0 30px 80px -20px rgba(0,0,0,0.7)" }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 20px" }}>Create API key</h2>
+        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {error && <div style={{ background: "oklch(0.65 0.24 22 / 0.10)", border: "1px solid oklch(0.65 0.24 22 / 0.30)", color: "var(--sev-critical)", padding: "10px 14px", borderRadius: 8, fontSize: 13 }}>{error}</div>}
           <div>
-            <label className="block text-xs font-medium text-[#9ca3af] mb-1.5">Name</label>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 500, color: "var(--fg-muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Name</label>
             <input type="text" value={name} onChange={e => setName(e.target.value)} required placeholder="github-actions"
-              className="w-full bg-[#0f1117] border border-[#2a2d3a] rounded-lg px-3 py-2.5 text-sm text-[#e8eaf0] focus:outline-none focus:border-indigo-500"
+              style={{ width: "100%", padding: "8px 12px", background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 13, color: "var(--fg)", outline: "none", boxSizing: "border-box" }}
+              onFocus={e => (e.target.style.borderColor = "var(--accent-dim)")}
+              onBlur={e => (e.target.style.borderColor = "var(--border)")}
             />
           </div>
-          <div className="flex gap-3 justify-end">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-[#6b7280] hover:text-[#e8eaf0]">Cancel</button>
-            <button type="submit" disabled={loading} className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg disabled:opacity-50">
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+            <button type="button" onClick={onClose} style={{ padding: "7px 14px", fontSize: 13, color: "var(--fg-muted)", background: "transparent", border: "none", cursor: "pointer" }}>Cancel</button>
+            <button type="submit" disabled={loading} style={{
+              padding: "7px 16px", fontSize: 13, fontWeight: 500,
+              background: "linear-gradient(180deg, oklch(0.92 0.16 130), oklch(0.78 0.18 130))",
+              color: "#08080b", border: "none", borderRadius: 8, cursor: "pointer",
+              opacity: loading ? 0.6 : 1,
+            }}>
               {loading ? "Creating…" : "Create key"}
             </button>
           </div>
@@ -49,18 +54,17 @@ function KeyReveal({ apiKey }: { apiKey: APIKey }) {
   const [copied, setCopied] = useState(false);
   function copy() {
     if (apiKey.key) { navigator.clipboard.writeText(apiKey.key); toast("Key copied to clipboard"); }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   }
   return (
-    <div className="bg-green-500/5 border border-green-500/20 rounded-xl p-4 mb-5">
-      <p className="text-sm font-medium text-green-400 mb-2">Key created — copy it now, it won&apos;t be shown again</p>
-      <div className="flex items-center gap-2">
-        <code className="flex-1 bg-[#0f1117] border border-[#2a2d3a] rounded-lg px-3 py-2 text-xs font-mono text-[#e8eaf0] break-all">
+    <div style={{ background: "oklch(0.86 0.18 130 / 0.06)", border: "1px solid oklch(0.86 0.18 130 / 0.25)", borderRadius: 12, padding: 16, marginBottom: 20 }}>
+      <p style={{ fontSize: 13, fontWeight: 500, color: "var(--accent)", marginBottom: 10 }}>Key created — copy it now, it won&apos;t be shown again</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <code style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--fg)", wordBreak: "break-all" }}>
           {apiKey.key}
         </code>
-        <button onClick={copy} className="flex-shrink-0 p-2 text-[#6b7280] hover:text-green-400 transition-colors">
-          {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+        <button onClick={copy} style={{ flexShrink: 0, padding: 8, background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--fg-muted)", cursor: "pointer" }}>
+          {copied ? <Check size={14} style={{ color: "var(--accent)" }}/> : <Copy size={14}/>}
         </button>
       </div>
     </div>
@@ -85,96 +89,110 @@ export default function APIKeysPage() {
     catch (err) { toast(err instanceof Error ? err.message : "Failed", "error"); }
   }
 
-  function handleCreated(key: APIKey) {
-    setNewKey(key);
-    setShowModal(false);
-    reload();
-  }
+  function handleCreated(key: APIKey) { setNewKey(key); setShowModal(false); reload(); }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div style={{ padding: "28px 32px", maxWidth: 900, margin: "0 auto", animation: "page-in 320ms cubic-bezier(0.2,0.7,0.2,1)" }}>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 28, gap: 16 }}>
         <div>
-          <h1 className="text-xl font-bold text-[#e8eaf0]">API Keys</h1>
-          <p className="text-sm text-[#6b7280] mt-0.5">Used for CI/CD pipelines and the trivy-push CLI</p>
+          <h1 style={{ fontSize: 26, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}>API Keys</h1>
+          <p style={{ color: "var(--fg-dim)", fontSize: 13.5, marginTop: 4 }}>Used for CI/CD pipelines and the trivy-push CLI</p>
         </div>
-        <button onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm rounded-lg transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          New key
+        <button onClick={() => setShowModal(true)} style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 500,
+          background: "linear-gradient(180deg, oklch(0.92 0.16 130), oklch(0.78 0.18 130))",
+          color: "#08080b", border: "none", cursor: "pointer",
+          boxShadow: "0 0 0 1px oklch(0.78 0.18 130), 0 8px 24px -8px var(--accent-glow)",
+        }}>
+          <Plus size={14}/> New key
         </button>
       </div>
 
-      {newKey && <KeyReveal apiKey={newKey} />}
+      {newKey && <KeyReveal apiKey={newKey}/>}
 
-      <Card>
-        <table className="w-full text-sm">
+      {/* Keys table */}
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "hidden", marginBottom: 20 }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr className="border-b border-[#2a2d3a]">
+            <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
               {["Name", "Prefix", "Created", "Last used", "Status", ""].map((h, i) => (
-                <th key={i} className={`text-left px-5 py-3 text-xs font-medium text-[#6b7280] ${i === 5 ? "text-right" : ""}`}>{h}</th>
+                <th key={i} style={{ textAlign: i === 5 ? "right" : "left", padding: "11px 16px", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fg-dim)", fontWeight: 500 }}>{h}</th>
               ))}
             </tr>
           </thead>
-          {loading ? <TableSkeleton rows={3} cols={6} /> : (
-            <tbody className="divide-y divide-[#2a2d3a]">
-              {keys.length === 0 ? (
-                <tr><td colSpan={6} className="px-5 py-12 text-center text-sm text-[#6b7280]">No API keys yet</td></tr>
-              ) : keys.map(k => (
-                <tr key={k.id} className={`hover:bg-[#1e2028] transition-colors ${k.revoked ? "opacity-40" : ""}`}>
-                  <td className="px-5 py-4 font-medium text-[#e8eaf0]">{k.name}</td>
-                  <td className="px-5 py-4 font-mono text-xs text-[#6b7280]">{k.key_prefix}…</td>
-                  <td className="px-5 py-4 text-xs text-[#6b7280]">{format(new Date(k.created_at), "MMM d, yyyy")}</td>
-                  <td className="px-5 py-4 text-xs text-[#6b7280]">{k.last_used_at ? format(new Date(k.last_used_at), "MMM d, HH:mm") : "Never"}</td>
-                  <td className="px-5 py-4">
-                    {k.revoked
-                      ? <span className="text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">Revoked</span>
-                      : <span className="text-xs text-green-400 bg-green-500/10 px-2 py-0.5 rounded-full">Active</span>}
-                  </td>
-                  <td className="px-5 py-4 text-right">
-                    {!k.revoked && (
-                      <button onClick={() => revoke(k.id)} className="text-[#6b7280] hover:text-red-400 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </td>
+          <tbody>
+            {loading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}>
+                  {Array.from({ length: 6 }).map((_, j) => (
+                    <td key={j} style={{ padding: "14px 16px" }}>
+                      <div style={{ height: 12, background: "var(--surface-2)", borderRadius: 4 }}/>
+                    </td>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          )}
-        </table>
-      </Card>
-
-      {/* Usage */}
-      <Card>
-        <div className="p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <Terminal className="w-4 h-4 text-[#6b7280]" />
-            <p className="text-sm font-medium text-[#e8eaf0]">Quick start</p>
-          </div>
-          <div className="space-y-2">
-            {[
-              "trivy-push config --url https://api.trivyhub.fr --key tvd_xxx",
-              "trivy image --format json my-image:latest | trivy-push push --project my-app",
-            ].map((cmd, i) => (
-              <div key={i} className="bg-[#0f1117] border border-[#2a2d3a] rounded-lg px-4 py-2.5">
-                <code className="text-xs font-mono text-indigo-300">{cmd}</code>
-              </div>
+              ))
+            ) : keys.length === 0 ? (
+              <tr><td colSpan={6} style={{ padding: "48px 0", textAlign: "center", color: "var(--fg-dim)", fontSize: 13 }}>No API keys yet</td></tr>
+            ) : keys.map(k => (
+              <tr key={k.id}
+                style={{ borderBottom: "1px solid var(--border)", opacity: k.revoked ? 0.4 : 1, transition: "background 140ms ease" }}
+                onMouseEnter={e => (e.currentTarget.style.background = "var(--surface-2)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+              >
+                <td style={{ padding: "14px 16px", fontWeight: 500, fontSize: 13 }}>{k.name}</td>
+                <td style={{ padding: "14px 16px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-dim)" }}>{k.key_prefix}…</td>
+                <td style={{ padding: "14px 16px", fontSize: 12, color: "var(--fg-dim)" }}>{format(new Date(k.created_at), "MMM d, yyyy")}</td>
+                <td style={{ padding: "14px 16px", fontSize: 12, color: "var(--fg-dim)" }}>{k.last_used_at ? format(new Date(k.last_used_at), "MMM d, HH:mm") : <span style={{ color: "var(--fg-faint)" }}>Never</span>}</td>
+                <td style={{ padding: "14px 16px" }}>
+                  {k.revoked
+                    ? <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "oklch(0.65 0.24 22 / 0.10)", color: "var(--sev-critical)", fontFamily: "var(--font-mono)" }}>Revoked</span>
+                    : <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "oklch(0.86 0.18 130 / 0.10)", color: "var(--accent)", fontFamily: "var(--font-mono)" }}>Active</span>}
+                </td>
+                <td style={{ padding: "14px 16px", textAlign: "right" }}>
+                  {!k.revoked && (
+                    <button onClick={() => revoke(k.id)} style={{ background: "transparent", border: "none", color: "var(--fg-faint)", cursor: "pointer", transition: "color 140ms ease" }}
+                      onMouseEnter={e => ((e.currentTarget as HTMLElement).style.color = "var(--sev-critical)")}
+                      onMouseLeave={e => ((e.currentTarget as HTMLElement).style.color = "var(--fg-faint)")}
+                    >
+                      <Trash2 size={14}/>
+                    </button>
+                  )}
+                </td>
+              </tr>
             ))}
-          </div>
-          <p className="text-xs text-[#6b7280] mt-3">
-            Or use the{" "}
-            <a href="https://github.com/theo-mrn/trivy_dashboard/blob/main/.github/actions/trivy-push/action.yml"
-              target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300">
-              GitHub Action
-            </a>
-            {" "}for automatic integration in your CI/CD pipelines.
-          </p>
-        </div>
-      </Card>
+          </tbody>
+        </table>
+      </div>
 
-      {showModal && <NewKeyModal onClose={() => setShowModal(false)} onCreated={handleCreated} />}
+      {/* Quick start */}
+      <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <Terminal size={15} style={{ color: "var(--fg-dim)" }}/>
+          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--fg-muted)" }}>Quick start</span>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {[
+            "trivy-push config --url https://api.trivyhub.fr --key tvd_xxx",
+            "trivy image --format json my-image:latest | trivy-push push --project my-app",
+          ].map((cmd, i) => (
+            <div key={i} style={{ background: "#050507", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px" }}>
+              <code style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "oklch(0.78 0.16 280)" }}>{cmd}</code>
+            </div>
+          ))}
+        </div>
+        <p style={{ fontSize: 12, color: "var(--fg-faint)", marginTop: 12 }}>
+          Or use the{" "}
+          <a href="https://github.com/theo-mrn/trivy_dashboard/blob/main/.github/actions/trivy-push/action.yml"
+            target="_blank" rel="noopener noreferrer"
+            style={{ color: "var(--violet)", textDecoration: "none" }}>
+            GitHub Action
+          </a>
+          {" "}for CI/CD integration.
+        </p>
+      </div>
+
+      {showModal && <Modal onClose={() => setShowModal(false)} onCreated={handleCreated}/>}
     </div>
   );
 }

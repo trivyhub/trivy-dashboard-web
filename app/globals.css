@@ -114,3 +114,39 @@ input::placeholder, textarea::placeholder {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+/* Pulse (used by PulseDot) */
+@keyframes pulse {
+  0% { transform: scale(0.6); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* Severity chips */
+.sev {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+}
+.sev::before { content: ""; width: 6px; height: 6px; border-radius: 50%; }
+.sev.critical { background: oklch(0.65 0.24 22 / 0.14); color: var(--sev-critical); }
+.sev.critical::before { background: var(--sev-critical); box-shadow: 0 0 6px var(--sev-critical); }
+.sev.high { background: oklch(0.72 0.18 50 / 0.14); color: var(--sev-high); }
+.sev.high::before { background: var(--sev-high); }
+.sev.medium { background: oklch(0.82 0.16 90 / 0.14); color: var(--sev-medium); }
+.sev.medium::before { background: var(--sev-medium); }
+.sev.low { background: oklch(0.70 0.14 245 / 0.14); color: var(--sev-low); }
+.sev.low::before { background: var(--sev-low); }
+.sev.info { background: var(--surface-3); color: var(--fg-muted); }
+.sev.info::before { background: var(--fg-faint); }
+
+/* Fade-in (modals) */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
