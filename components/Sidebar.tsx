@@ -13,10 +13,11 @@ const NAV_GROUPS = [
   {
     label: "Workspace",
     items: [
-      { href: "/dashboard",                 label: "Overview",         icon: LayoutDashboard },
-      { href: "/dashboard/vulnerabilities", label: "CVEs",             icon: ShieldAlert, badge: "11", badgeCrit: true },
-      { href: "/dashboard/projects",        label: "Projects",         icon: FolderGit2 },
-      { href: "/dashboard/members",         label: "Members",          icon: Users },
+      { href: "/dashboard",                  label: "Overview",       icon: LayoutDashboard },
+      { href: "/dashboard/vulnerabilities",  label: "CVEs",           icon: ShieldAlert },
+      { href: "/dashboard/projects",         label: "Projects",       icon: FolderGit2 },
+      { href: "/dashboard/notifications",    label: "Notifications",  icon: Bell },
+      { href: "/dashboard/members",          label: "Members",        icon: Users },
     ],
   },
   {
@@ -130,7 +131,7 @@ export function Sidebar() {
           }}>
             {group.label}
           </div>
-          {group.items.map(({ href, label, icon: Icon, badge, badgeCrit }) => {
+          {group.items.map(({ href, label, icon: Icon, badge = undefined, badgeCrit = false }: { href: string; label: string; icon: React.ElementType; badge?: string; badgeCrit?: boolean }) => {
             const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
             return (
               <Link
