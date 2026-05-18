@@ -2,9 +2,20 @@
 import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Shield } from "lucide-react";
 import { authApi } from "@/lib/api";
 import { saveAuth } from "@/lib/auth";
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  background: "var(--bg)",
+  border: "1px solid var(--border-strong)",
+  borderRadius: 8,
+  padding: "10px 12px",
+  fontSize: 13,
+  color: "var(--fg)",
+  outline: "none",
+  transition: "border-color 160ms ease, box-shadow 160ms ease",
+};
 
 function LoginForm() {
   const router = useRouter();
@@ -33,36 +44,99 @@ function LoginForm() {
   }
 
   return (
-    <div className="bg-[#16181f] border border-[#2a2d3a] rounded-xl p-6">
+    <div style={{
+      background: "var(--surface)",
+      border: "1px solid var(--border-strong)",
+      borderRadius: 14,
+      padding: 24,
+    }}>
       {expired && (
-        <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 rounded-lg px-4 py-3 text-sm mb-4">
+        <div style={{
+          background: "oklch(0.82 0.16 90 / 0.08)",
+          border: "1px solid oklch(0.82 0.16 90 / 0.20)",
+          color: "var(--sev-medium)",
+          borderRadius: 8,
+          padding: "10px 14px",
+          fontSize: 13,
+          marginBottom: 16,
+        }}>
           Your session has expired. Please sign in again.
         </div>
       )}
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg px-4 py-3 text-sm mb-4">
+        <div style={{
+          background: "oklch(0.65 0.24 22 / 0.08)",
+          border: "1px solid oklch(0.65 0.24 22 / 0.20)",
+          color: "var(--sev-critical)",
+          borderRadius: 8,
+          padding: "10px 14px",
+          fontSize: 13,
+          marginBottom: 16,
+        }}>
           {error}
         </div>
       )}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs font-medium text-[#9ca3af] mb-1.5">Email</label>
+      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-muted)" }}>Email</label>
           <input
             type="email" value={email} onChange={e => setEmail(e.target.value)} required
-            className="w-full bg-[#0f1117] border border-[#2a2d3a] rounded-lg px-3 py-2.5 text-sm text-[#e8eaf0] focus:outline-none focus:border-indigo-500 transition-colors"
+            style={inputStyle}
             placeholder="you@company.com"
+            onFocus={e => {
+              e.target.style.borderColor = "var(--accent-dim)";
+              e.target.style.boxShadow = "0 0 0 3px oklch(0.86 0.18 130 / 0.12)";
+            }}
+            onBlur={e => {
+              e.target.style.borderColor = "var(--border-strong)";
+              e.target.style.boxShadow = "none";
+            }}
           />
         </div>
-        <div>
-          <label className="block text-xs font-medium text-[#9ca3af] mb-1.5">Password</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: "var(--fg-muted)" }}>Password</label>
           <input
             type="password" value={password} onChange={e => setPassword(e.target.value)} required
-            className="w-full bg-[#0f1117] border border-[#2a2d3a] rounded-lg px-3 py-2.5 text-sm text-[#e8eaf0] focus:outline-none focus:border-indigo-500 transition-colors"
+            style={inputStyle}
             placeholder="••••••••"
+            onFocus={e => {
+              e.target.style.borderColor = "var(--accent-dim)";
+              e.target.style.boxShadow = "0 0 0 3px oklch(0.86 0.18 130 / 0.12)";
+            }}
+            onBlur={e => {
+              e.target.style.borderColor = "var(--border-strong)";
+              e.target.style.boxShadow = "none";
+            }}
           />
         </div>
-        <button type="submit" disabled={loading}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-colors text-sm mt-2"
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            width: "100%",
+            background: "linear-gradient(180deg, oklch(0.92 0.16 130), oklch(0.78 0.18 130))",
+            color: "#08080b",
+            border: "none",
+            borderRadius: 8,
+            padding: "10px",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: loading ? "not-allowed" : "pointer",
+            opacity: loading ? 0.6 : 1,
+            transition: "filter 160ms ease, transform 160ms ease",
+            boxShadow: "0 0 0 1px oklch(0.78 0.18 130), 0 8px 24px -8px var(--accent-glow)",
+            marginTop: 4,
+          }}
+          onMouseEnter={e => {
+            if (!loading) {
+              (e.currentTarget as HTMLElement).style.filter = "brightness(1.05)";
+              (e.currentTarget as HTMLElement).style.transform = "translateY(-1px)";
+            }
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.filter = "none";
+            (e.currentTarget as HTMLElement).style.transform = "none";
+          }}
         >
           {loading ? "Signing in…" : "Sign in"}
         </button>
@@ -73,21 +147,57 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen bg-[#0f1117] flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-indigo-500/10 mb-4">
-            <Shield className="w-6 h-6 text-indigo-400" />
+    <div style={{
+      minHeight: "100vh",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "0 16px",
+    }}>
+      <div style={{ width: "100%", maxWidth: 360 }}>
+        <div style={{ textAlign: "center", marginBottom: 32 }}>
+          <div style={{
+            width: 48, height: 48,
+            borderRadius: 14,
+            background: "linear-gradient(135deg, var(--accent), var(--violet))",
+            display: "grid", placeItems: "center",
+            color: "#08080b",
+            fontWeight: 700,
+            fontFamily: "var(--font-mono)",
+            fontSize: 20,
+            boxShadow: "0 0 32px var(--accent-glow)",
+            position: "relative",
+            overflow: "hidden",
+            margin: "0 auto 16px",
+          }}>
+            T
+            <span style={{
+              position: "absolute", inset: 0,
+              background: "conic-gradient(from 0deg, transparent, rgba(255,255,255,0.18), transparent 30%)",
+              animation: "brand-spin 4s linear infinite",
+            }}/>
           </div>
-          <h1 className="text-2xl font-bold text-[#e8eaf0]">TrivyHub</h1>
-          <p className="text-[#6b7280] text-sm mt-1">Sign in to your organization</p>
+          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--fg)", margin: 0 }}>
+            Trivihub
+          </h1>
+          <p style={{ color: "var(--fg-dim)", fontSize: 13.5, marginTop: 6 }}>
+            Sign in to your organization
+          </p>
         </div>
-        <Suspense fallback={<div className="bg-[#16181f] border border-[#2a2d3a] rounded-xl p-6 h-48 animate-pulse" />}>
+        <Suspense fallback={
+          <div style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border-strong)",
+            borderRadius: 14,
+            padding: 24,
+            height: 200,
+          }}/>
+        }>
           <LoginForm />
         </Suspense>
-        <p className="text-center text-sm text-[#6b7280] mt-4">
+        <p style={{ textAlign: "center", fontSize: 13, color: "var(--fg-dim)", marginTop: 16 }}>
           No account?{" "}
-          <Link href="/register" className="text-indigo-400 hover:text-indigo-300 font-medium">
+          <Link href="/register" style={{ color: "var(--accent)", fontWeight: 500 }}>
             Create organization
           </Link>
         </p>

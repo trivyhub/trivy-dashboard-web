@@ -4,106 +4,244 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard, FolderGit2, ShieldAlert, Users, Key,
-  LogOut, Shield, ChevronLeft, ChevronRight, Sun, Moon, Settings
+  LogOut, Settings, ChevronsUpDown, Bell, Plug
 } from "lucide-react";
 import { clearAuth, getUser } from "@/lib/auth";
-import { getTheme, setTheme, initTheme } from "@/lib/theme";
 import type { User } from "@/lib/types";
-import { RoleBadge } from "@/components/ui/Badge";
 
-const nav = [
-  { href: "/dashboard",                 label: "Overview",        icon: LayoutDashboard },
-  { href: "/dashboard/projects",        label: "Projects",        icon: FolderGit2 },
-  { href: "/dashboard/vulnerabilities", label: "Vulnerabilities", icon: ShieldAlert },
-  { href: "/dashboard/members",         label: "Members",         icon: Users },
-  { href: "/dashboard/api-keys",        label: "API Keys",        icon: Key },
-  { href: "/dashboard/settings",        label: "Settings",        icon: Settings },
+const NAV_GROUPS = [
+  {
+    label: "Workspace",
+    items: [
+      { href: "/dashboard",                 label: "Overview",         icon: LayoutDashboard },
+      { href: "/dashboard/vulnerabilities", label: "CVEs",             icon: ShieldAlert, badge: "11", badgeCrit: true },
+      { href: "/dashboard/projects",        label: "Projects",         icon: FolderGit2 },
+      { href: "/dashboard/members",         label: "Members",          icon: Users },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      { href: "/dashboard/api-keys",        label: "API Keys",         icon: Key },
+      { href: "/dashboard/settings",        label: "Settings",         icon: Settings },
+    ],
+  },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
-  const [theme, setThemeState] = useState<"dark" | "light">("dark");
 
-  useEffect(() => {
-    setUser(getUser());
-    initTheme();
-    setThemeState(getTheme());
-  }, []);
-
-  function toggleTheme() {
-    const next = theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    setThemeState(next);
-  }
+  useEffect(() => { setUser(getUser()); }, []);
 
   function logout() { clearAuth(); router.push("/login"); }
 
+  const initials = user?.email
+    ? user.email.slice(0, 2).toUpperCase()
+    : "?";
+
   return (
-    <aside style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
-      className={`flex-shrink-0 flex flex-col h-screen sticky top-0 border-r transition-all duration-200 ${collapsed ? "w-16" : "w-56"}`}
-    >
-      {/* Logo */}
-      <div style={{ borderColor: "var(--border)" }} className="flex items-center justify-between px-4 py-4 border-b">
-        {!collapsed && (
-          <div className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-indigo-400 flex-shrink-0" />
-            <span className="font-semibold text-sm" style={{ color: "var(--text)" }}>TrivyHub</span>
-          </div>
-        )}
-        {collapsed && <Shield className="w-5 h-5 text-indigo-400 mx-auto" />}
-        <button onClick={() => setCollapsed(c => !c)} style={{ color: "var(--text-muted)" }}
-          className="hover:text-indigo-400 transition-colors ml-auto"
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
+    <aside style={{
+      width: 240,
+      background: "linear-gradient(180deg, rgba(255,255,255,0.015), transparent 30%), var(--bg-elev)",
+      borderRight: "1px solid var(--border)",
+      display: "flex",
+      flexDirection: "column",
+      padding: "16px 12px",
+      gap: 4,
+      position: "sticky",
+      top: 0,
+      height: "100vh",
+      flexShrink: 0,
+    }}>
+      {/* Brand */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 8px 14px" }}>
+        <div style={{
+          width: 28, height: 28,
+          borderRadius: 8,
+          background: "linear-gradient(135deg, var(--accent), var(--violet))",
+          display: "grid", placeItems: "center",
+          color: "#08080b",
+          fontWeight: 700,
+          fontFamily: "var(--font-mono)",
+          fontSize: 13,
+          boxShadow: "0 0 24px var(--accent-glow)",
+          position: "relative",
+          overflow: "hidden",
+          flexShrink: 0,
+        }}>
+          T
+          <span style={{
+            position: "absolute", inset: 0,
+            background: "conic-gradient(from 0deg, transparent, rgba(255,255,255,0.18), transparent 30%)",
+            animation: "brand-spin 4s linear infinite",
+          }}/>
+        </div>
+        <span style={{ fontWeight: 600, letterSpacing: "-0.01em", fontSize: 15, color: "var(--fg)" }}>
+          Trivihub
+        </span>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-2 py-3 space-y-0.5">
-        {nav.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
-          return (
-            <Link key={href} href={href} title={collapsed ? label : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                active ? "bg-indigo-500/10 text-indigo-400" : "hover:bg-[var(--bg-hover)]"
-              }`}
-              style={{ color: active ? undefined : "var(--text-muted)" }}
-            >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {!collapsed && label}
-            </Link>
-          );
-        })}
-      </nav>
+      {/* Project switcher */}
+      <div
+        onClick={() => router.push("/dashboard/projects")}
+        style={{
+          margin: "0 4px 12px",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          padding: "8px 10px",
+          display: "flex", alignItems: "center", gap: 8,
+          background: "var(--surface)",
+          cursor: "pointer",
+          transition: "border-color 160ms ease, background 160ms ease",
+        }}
+        onMouseEnter={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = "var(--border-bright)";
+          (e.currentTarget as HTMLElement).style.background = "var(--surface-2)";
+        }}
+        onMouseLeave={e => {
+          (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+          (e.currentTarget as HTMLElement).style.background = "var(--surface)";
+        }}
+      >
+        <div style={{
+          width: 22, height: 22, borderRadius: 6,
+          background: "linear-gradient(135deg, oklch(0.65 0.20 280), oklch(0.65 0.20 240))",
+          flexShrink: 0,
+        }}/>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: "var(--fg)" }}>All projects</div>
+          <div style={{ fontSize: 11, color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}>main</div>
+        </div>
+        <ChevronsUpDown size={14} style={{ color: "var(--fg-faint)", flexShrink: 0 }}/>
+      </div>
 
-      {/* Bottom */}
-      <div style={{ borderColor: "var(--border)" }} className="px-3 py-4 border-t space-y-3">
-        {/* Theme toggle */}
-        <button onClick={toggleTheme} title={theme === "dark" ? "Light mode" : "Dark mode"}
-          className={`flex items-center gap-2 text-sm transition-colors w-full px-3 py-2 rounded-lg hover:bg-[var(--bg-hover)] ${collapsed ? "justify-center" : ""}`}
-          style={{ color: "var(--text-muted)" }}
-        >
-          {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          {!collapsed && (theme === "dark" ? "Light mode" : "Dark mode")}
-        </button>
-
-        {/* User */}
-        {!collapsed && user && (
-          <div className="px-3 pb-1">
-            <p className="text-xs font-medium truncate" style={{ color: "var(--text)" }}>{user.email}</p>
-            <div className="mt-1"><RoleBadge role={user.role} /></div>
+      {/* Nav groups */}
+      {NAV_GROUPS.map((group) => (
+        <div key={group.label}>
+          <div style={{
+            fontSize: 10.5,
+            textTransform: "uppercase",
+            letterSpacing: "0.08em",
+            color: "var(--fg-faint)",
+            padding: "14px 10px 6px",
+            fontWeight: 500,
+          }}>
+            {group.label}
           </div>
-        )}
+          {group.items.map(({ href, label, icon: Icon, badge, badgeCrit }) => {
+            const active = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+            return (
+              <Link
+                key={href}
+                href={href}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "7px 10px",
+                  borderRadius: 8,
+                  fontSize: 13.5,
+                  color: active ? "var(--fg)" : "var(--fg-muted)",
+                  background: active ? "linear-gradient(180deg, var(--surface-2), var(--surface))" : "transparent",
+                  boxShadow: active ? "inset 0 0 0 1px var(--border-strong)" : "none",
+                  transition: "all 140ms ease",
+                  textDecoration: "none",
+                  position: "relative",
+                  userSelect: "none",
+                }}
+                onMouseEnter={e => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.color = "var(--fg)";
+                    (e.currentTarget as HTMLElement).style.background = "var(--surface)";
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!active) {
+                    (e.currentTarget as HTMLElement).style.color = "var(--fg-muted)";
+                    (e.currentTarget as HTMLElement).style.background = "transparent";
+                  }
+                }}
+              >
+                {active && (
+                  <span style={{
+                    position: "absolute", left: -12, top: 8, bottom: 8, width: 2,
+                    background: "var(--accent)",
+                    borderRadius: 2,
+                    boxShadow: "0 0 8px var(--accent-glow)",
+                  }}/>
+                )}
+                <Icon size={16} style={{ flexShrink: 0, opacity: 0.85 }}/>
+                <span style={{ flex: 1 }}>{label}</span>
+                {badge && (
+                  <span style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                    background: badgeCrit ? "oklch(0.65 0.24 22 / 0.16)" : "var(--surface-3)",
+                    color: badgeCrit ? "var(--sev-critical)" : "var(--fg-muted)",
+                  }}>
+                    {badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
 
-        <button onClick={logout} title="Logout"
-          className={`flex items-center gap-2 text-sm transition-colors w-full px-3 py-2 rounded-lg hover:bg-[var(--bg-hover)] ${collapsed ? "justify-center" : ""}`}
-          style={{ color: "var(--text-muted)" }}
+      {/* Footer */}
+      <div style={{
+        marginTop: "auto",
+        paddingTop: 12,
+        borderTop: "1px solid var(--border)",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: "50%",
+          background: "linear-gradient(135deg, oklch(0.65 0.18 30), oklch(0.65 0.18 60))",
+          display: "grid", placeItems: "center",
+          fontSize: 11, fontWeight: 600, color: "#08080b",
+          flexShrink: 0,
+        }}>
+          {initials}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, color: "var(--fg)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {user?.email ?? ""}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--fg-dim)" }}>
+            {user?.role ?? ""}
+          </div>
+        </div>
+        <button
+          onClick={logout}
+          title="Logout"
+          style={{
+            width: 28, height: 28,
+            display: "grid", placeItems: "center",
+            borderRadius: 7,
+            border: "1px solid transparent",
+            color: "var(--fg-muted)",
+            transition: "all 140ms ease",
+            cursor: "pointer",
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLElement).style.background = "var(--surface)";
+            (e.currentTarget as HTMLElement).style.color = "var(--fg)";
+            (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLElement).style.background = "transparent";
+            (e.currentTarget as HTMLElement).style.color = "var(--fg-muted)";
+            (e.currentTarget as HTMLElement).style.borderColor = "transparent";
+          }}
         >
-          <LogOut className="w-4 h-4" />
-          {!collapsed && "Logout"}
+          <LogOut size={14}/>
         </button>
       </div>
     </aside>
