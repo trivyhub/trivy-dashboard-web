@@ -4,7 +4,13 @@ import Link from "next/link";
 import { projectsApi } from "@/lib/api";
 import type { Project } from "@/lib/types";
 import { Search, LayoutGrid, List, Plus, GitBranch, Clock, ChevronRight } from "lucide-react";
-import { format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { fr } from "date-fns/locale";
+
+function timeAgo(date: string | null) {
+  if (!date) return "Jamais scanné";
+  return formatDistanceToNow(new Date(date), { addSuffix: true, locale: fr });
+}
 
 /* ── Stack tag ───────────────────────────────────────────────── */
 
@@ -236,7 +242,7 @@ function ProjectCard({ project: p }: { project: Project }) {
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <Clock size={11}/>
-            <span>{p.last_scan ? format(new Date(p.last_scan), "MMM d, HH:mm") : "Never scanned"}</span>
+            <span>{timeAgo(p.last_scan)}</span>
           </span>
         </div>
       </Spotlight>
@@ -405,7 +411,7 @@ export default function ProjectsPage() {
                           <DeltaBadge delta={delta}/>
                         </td>
                         <td style={{ padding: "12px 16px", fontSize: 11.5, color: "var(--fg-dim)", fontFamily: "var(--font-mono)", whiteSpace: "nowrap" }}>
-                          {p.last_scan ? format(new Date(p.last_scan), "MMM d, HH:mm") : "—"}
+                          {p.last_scan ? timeAgo(p.last_scan) : "—"}
                         </td>
                         <td style={{ padding: "12px 16px" }}>
                           <ChevronRight size={12} style={{ color: "var(--fg-faint)" }}/>

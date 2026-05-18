@@ -5,10 +5,42 @@ import Link from "next/link";
 import { ChevronRight, GitBranch, Clock, ArrowUp, ArrowDown, Minus, ExternalLink } from "lucide-react";
 import { projectsApi } from "@/lib/api";
 import type { Project, Vulnerability, ScanSummary } from "@/lib/types";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { fr } from "date-fns/locale";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
+
+/* ── helpers ─────────────────────────────────────────────────── */
+
+function timeAgo(date: string) {
+  return formatDistanceToNow(new Date(date), { addSuffix: true, locale: fr });
+}
+
+const LANG_COLORS: Record<string, string> = {
+  Go: "#00ADD8", TypeScript: "#3178C6", Node: "#5FA04E", Python: "#FFD43B",
+  Docker: "#2496ED", Rust: "#CE412B", Terraform: "#7B42BC", IaC: "#5b21b6",
+  Java: "#E76F00", JavaScript: "#F7DF1E", "C#": "#9B4F96", Ruby: "#CC342D",
+  PHP: "#777BB4", Swift: "#FA7343",
+};
+
+function StackTag({ name }: { name: string }) {
+  const color = LANG_COLORS[name] ?? "#71717a";
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 5,
+      padding: "3px 8px", borderRadius: 999,
+      fontSize: 11, border: "1px solid var(--border)",
+      background: "var(--surface-2)", color: "var(--fg-muted)",
+      fontFamily: "var(--font-mono)",
+    }}>
+      <span style={{ width: 14, height: 14, borderRadius: 4, background: color, display: "grid", placeItems: "center", fontSize: 8, fontWeight: 700, color: "#08080b", flexShrink: 0 }}>
+        {name[0]}
+      </span>
+      {name}
+    </span>
+  );
+}
 
 /* ── shared helpers ──────────────────────────────────────────── */
 
@@ -209,14 +241,38 @@ export default function ProjectDetailPage() {
           </div>
           <div>
             <h1 style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-0.02em", margin: 0 }}>{name}</h1>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 5, fontSize: 12, color: "var(--fg-dim)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 5, fontSize: 12, color: "var(--fg-dim)", flexWrap: "wrap" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 5 }}><GitBranch size={11}/>main</span>
               <span style={{ color: "var(--fg-faint)" }}>·</span>
               <span>{p?.environment ?? "production"}</span>
               {p?.owner && <><span style={{ color: "var(--fg-faint)" }}>·</span><span>@{p.owner}</span></>}
               <span style={{ color: "var(--fg-faint)" }}>·</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 5 }}><Clock size={11}/>{p?.last_scan ? format(new Date(p.last_scan), "MMM d, HH:mm") : "Jamais scanné"}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <Clock size={11}/>
+                {p?.last_scan
+                  ? <span title={format(new Date(p.last_scan), "d MMM yyyy HH:mm:ss")}>{timeAgo(p.last_scan)}</span>
+                  : "Jamais scanné"}
+              </span>
             </div>
+            {/* Image name */}
+            {scans[0]?.image_name && (
+              <div style={{ marginTop: 6, fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-faint)", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ padding: "2px 7px", background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 6 }}>
+                  {scans[0].image_name}
+                </span>
+                {scans[0].image_digest && (
+                  <span style={{ color: "var(--fg-faint)", fontSize: 10 }}>
+                    {scans[0].image_digest.slice(0, 19)}…
+                  </span>
+                )}
+              </div>
+            )}
+            {/* Stack tags from latest scan */}
+            {scans[0]?.langs && scans[0].langs.length > 0 && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                {scans[0].langs.map(l => <StackTag key={l} name={l}/>)}
+              </div>
+            )}
           </div>
         </div>
         <Link href={`/dashboard/projects/${encodeURIComponent(name)}/history`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, fontSize: 13, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--fg-muted)", textDecoration: "none" }}>
@@ -280,8 +336,9 @@ export default function ProjectDetailPage() {
             {[
               { label: "Environment", value: p?.environment ?? "production" },
               { label: "Owner",       value: p?.owner || "—" },
+              { label: "Image",       value: scans[0]?.image_name || "—" },
               { label: "Total scans", value: String(scans.length) },
-              { label: "Dernier scan", value: p?.last_scan ? format(new Date(p.last_scan), "MMM d, yyyy HH:mm") : "—" },
+              { label: "Dernier scan", value: p?.last_scan ? timeAgo(p.last_scan) : "—" },
             ].map(({ label, value }) => (
               <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
                 <span style={{ color: "var(--fg-dim)" }}>{label}</span>

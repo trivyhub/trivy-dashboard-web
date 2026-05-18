@@ -64,6 +64,7 @@ export interface ScanSummary {
   scanned_at: string;
   pipeline_id: string | null;
   pipeline_url: string | null;
+  langs: string[] | null;
   critical: number;
   high: number;
   medium: number;
