@@ -1,5 +1,5 @@
 "use client";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Search, Bell, Sparkles } from "lucide-react";
 
 const ROUTE_CRUMBS: Record<string, string[]> = {
@@ -13,6 +13,7 @@ const ROUTE_CRUMBS: Record<string, string[]> = {
 
 export function Topbar() {
   const pathname = usePathname();
+  const router = useRouter();
 
   const crumbs = (() => {
     if (ROUTE_CRUMBS[pathname]) return ROUTE_CRUMBS[pathname];
@@ -87,6 +88,7 @@ export function Topbar() {
       {/* Notifications */}
       <button
         title="Notifications"
+        onClick={() => router.push("/dashboard/notifications")}
         style={{
           width: 32, height: 32,
           display: "grid", placeItems: "center",
