@@ -1,10 +1,14 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { RefreshCw, Download, Play, ChevronRight, Copy, Check, GitBranch, ArrowUp, ArrowDown, Minus } from "lucide-react";
+import { RefreshCw, Download, Play, ChevronRight, Copy, Check, GitBranch, ArrowUp } from "lucide-react";
 import { projectsApi, vulnApi } from "@/lib/api";
 import type { Project, Vulnerability } from "@/lib/types";
 import { format, subDays } from "date-fns";
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 /* ── helpers ────────────────────────────────────────────────── */
 
@@ -81,185 +85,58 @@ function CvssGauge({ value, size = 44 }: { value: number; size?: number }) {
   );
 }
 
-/* ── StreamGraph ─────────────────────────────────────────────── */
+/* ── Evolution chart (Recharts) ──────────────────────────────── */
 
-const SEV_COLORS = {
-  critical: "var(--sev-critical)",
-  high:     "var(--sev-high)",
-  medium:   "var(--sev-medium)",
-  low:      "var(--sev-low)",
+const SEV_CSS: Record<string, string> = {
+  critical: "oklch(0.65 0.24 22)",
+  high:     "oklch(0.72 0.18 50)",
+  medium:   "oklch(0.82 0.16 90)",
+  low:      "oklch(0.70 0.14 245)",
 };
 
-function StreamGraph({ series, labels, height = 220 }: {
-  series: Array<{ key: string; label: string; color: string; values: number[] }>;
-  labels: string[];
-  height?: number;
-}) {
-  const [hover, setHover] = useState<number | null>(null);
-  const W = 800, H = height, PAD = { t: 12, b: 28, l: 36, r: 12 };
-  const innerW = W - PAD.l - PAD.r;
-  const innerH = H - PAD.t - PAD.b;
-  const n = labels.length;
-
-  const stacked: number[][] = [];
-  for (let i = 0; i < n; i++) {
-    let acc = 0;
-    const col = series.map(s => { acc += s.values[i] || 0; return acc; });
-    stacked.push(col);
-  }
-  const maxVal = Math.max(...stacked.map(col => col[col.length - 1])) || 1;
-
-  function xOf(i: number) { return PAD.l + (i / (n - 1)) * innerW; }
-  function yOf(v: number) { return PAD.t + innerH - (v / maxVal) * innerH; }
-
-  function buildPath(si: number) {
-    const bot = si === 0 ? Array(n).fill(0) : series.slice(0, si).map((_, j) => stacked[j][si - 1] ?? 0);
-    // top points forward, bot points backward for closed path
-    const topPts = stacked.map((col, i) => [xOf(i), yOf(col[si])] as [number, number]);
-    const botPts = bot.map((v, i) => [xOf(i), yOf(v)] as [number, number]);
-
-    const curve = (pts: [number, number][]) =>
-      pts.map(([x, y], i, a) => {
-        if (i === 0) return `M${x.toFixed(1)},${y.toFixed(1)}`;
-        const [px, py] = a[i - 1];
-        const cx = ((px + x) / 2).toFixed(1);
-        return `C${cx},${py.toFixed(1)} ${cx},${y.toFixed(1)} ${x.toFixed(1)},${y.toFixed(1)}`;
-      }).join(" ");
-
-    return curve(topPts) + " " + curve([...botPts].reverse()).replace(/^M/, "L") + " Z";
-  }
-
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => Math.round(f * maxVal));
-
-  const hoverX = hover !== null ? xOf(hover) : null;
-
+function EvoTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
   return (
-    <div style={{ position: "relative", width: "100%" }}>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        style={{ width: "100%", height }}
-        onMouseMove={e => {
-          const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
-          const relX = ((e.clientX - rect.left) / rect.width) * W;
-          const idx = Math.round(((relX - PAD.l) / innerW) * (n - 1));
-          setHover(Math.max(0, Math.min(n - 1, idx)));
-        }}
-        onMouseLeave={() => setHover(null)}
-      >
+    <div style={{
+      background: "var(--surface-2)", border: "1px solid var(--border-strong)",
+      borderRadius: 8, padding: "10px 12px",
+      fontSize: 11, fontFamily: "var(--font-mono)",
+      boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+    }}>
+      <div style={{ color: "var(--fg-dim)", marginBottom: 6, fontWeight: 500 }}>{label}</div>
+      {[...payload].reverse().map((p: any) => (
+        <div key={p.dataKey} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 3 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: p.color, display: "inline-block", flexShrink: 0 }}/>
+          <span style={{ flex: 1, color: "var(--fg-muted)" }}>{p.name}</span>
+          <span style={{ color: p.color, fontWeight: 600 }}>{p.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EvoChart({ data, height = 220 }: { data: Record<string, any>[]; height?: number }) {
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <AreaChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
         <defs>
-          {series.map((s, si) => (
-            <linearGradient key={s.key} id={`sg-fill-${s.key}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={s.color} stopOpacity={0.85}/>
-              <stop offset="100%" stopColor={s.color} stopOpacity={0.35}/>
+          {(["critical","high","medium","low"] as const).map(k => (
+            <linearGradient key={k} id={`grad-${k}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor={SEV_CSS[k]} stopOpacity={0.5}/>
+              <stop offset="100%" stopColor={SEV_CSS[k]} stopOpacity={0.05}/>
             </linearGradient>
           ))}
-          <filter id="glow-sg">
-            <feGaussianBlur stdDeviation="2" result="blur"/>
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
         </defs>
-
-        {/* Grid lines */}
-        {ticks.map(t => (
-          <g key={t}>
-            <line
-              x1={PAD.l} x2={W - PAD.r}
-              y1={yOf(t)} y2={yOf(t)}
-              stroke="rgba(255,255,255,0.04)" strokeWidth={1} strokeDasharray="4 4"
-            />
-            <text x={PAD.l - 6} y={yOf(t) + 4} textAnchor="end" fontSize={9}
-              fontFamily="var(--font-mono)" fill="var(--fg-faint)">{t}</text>
-          </g>
-        ))}
-
-        {/* X axis labels */}
-        {labels.map((lbl, i) => {
-          if (i % Math.ceil(n / 7) !== 0 && i !== n - 1) return null;
-          return (
-            <text key={i} x={xOf(i)} y={H - 6}
-              textAnchor="middle" fontSize={9}
-              fontFamily="var(--font-mono)" fill="var(--fg-faint)">{lbl}</text>
-          );
-        })}
-
-        {/* Filled areas */}
-        {[...series].reverse().map((s, ri) => {
-          const si = series.length - 1 - ri;
-          return (
-            <path
-              key={s.key}
-              d={buildPath(si)}
-              fill={`url(#sg-fill-${s.key})`}
-              opacity={hover !== null ? 0.7 : 1}
-              style={{ transition: "opacity 200ms ease" }}
-            />
-          );
-        })}
-
-        {/* Stroke lines on top */}
-        {series.map((s, si) => {
-          const pts = stacked.map((col, i) => [xOf(i), yOf(col[si])] as [number, number]);
-          const d = pts.map(([x, y], i, a) => {
-            if (i === 0) return `M${x.toFixed(1)},${y.toFixed(1)}`;
-            const [px, py] = a[i - 1];
-            const cx = ((px + x) / 2).toFixed(1);
-            return `C${cx},${py.toFixed(1)} ${cx},${y.toFixed(1)} ${x.toFixed(1)},${y.toFixed(1)}`;
-          }).join(" ");
-          return (
-            <path key={s.key} d={d} fill="none" stroke={s.color}
-              strokeWidth={1.5} filter="url(#glow-sg)" opacity={0.9}/>
-          );
-        })}
-
-        {/* Hover guide */}
-        {hoverX !== null && (
-          <g>
-            <line x1={hoverX} x2={hoverX} y1={PAD.t} y2={H - PAD.b}
-              stroke="rgba(255,255,255,0.12)" strokeWidth={1}/>
-            {series.map((s, si) => {
-              const v = stacked[hover!][si];
-              return (
-                <circle key={s.key} cx={hoverX} cy={yOf(v)} r={3.5}
-                  fill={s.color} stroke="var(--bg)" strokeWidth={1.5}/>
-              );
-            })}
-          </g>
-        )}
-      </svg>
-
-      {/* Hover tooltip */}
-      {hover !== null && (
-        <div style={{
-          position: "absolute",
-          top: 8,
-          left: Math.min(Math.max(xOf(hover) / 800 * 100, 5), 75) + "%",
-          background: "var(--surface-2)",
-          border: "1px solid var(--border-strong)",
-          borderRadius: 8,
-          padding: "8px 10px",
-          pointerEvents: "none",
-          fontSize: 11,
-          fontFamily: "var(--font-mono)",
-          backdropFilter: "blur(8px)",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.4)",
-          zIndex: 10,
-        }}>
-          <div style={{ color: "var(--fg-dim)", marginBottom: 4 }}>{labels[hover]}</div>
-          {[...series].reverse().map((s, ri) => {
-            const si = series.length - 1 - ri;
-            const prev = si > 0 ? stacked[hover!][si - 1] : 0;
-            const val = stacked[hover!][si] - prev;
-            return (
-              <div key={s.key} style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--fg-muted)" }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, display: "inline-block" }}/>
-                <span style={{ flex: 1 }}>{s.label}</span>
-                <span style={{ color: s.color, fontWeight: 600 }}>{val}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" strokeDasharray="4 4"/>
+        <XAxis dataKey="date" tick={{ fill: "var(--fg-faint)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
+        <YAxis tick={{ fill: "var(--fg-faint)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={28}/>
+        <Tooltip content={<EvoTooltip/>} cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }}/>
+        <Area type="monotone" dataKey="low"      name="Low"      stackId="s" stroke={SEV_CSS.low}      strokeWidth={1.5} fill={`url(#grad-low)`}/>
+        <Area type="monotone" dataKey="medium"   name="Medium"   stackId="s" stroke={SEV_CSS.medium}   strokeWidth={1.5} fill={`url(#grad-medium)`}/>
+        <Area type="monotone" dataKey="high"     name="High"     stackId="s" stroke={SEV_CSS.high}     strokeWidth={1.5} fill={`url(#grad-high)`}/>
+        <Area type="monotone" dataKey="critical" name="Critical" stackId="s" stroke={SEV_CSS.critical} strokeWidth={1.5} fill={`url(#grad-critical)`}/>
+      </AreaChart>
+    </ResponsiveContainer>
   );
 }
 
@@ -329,28 +206,29 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-/* ── Build evolution series from real data ───────────────────── */
+/* ── Build chart data ────────────────────────────────────────── */
 
-function buildEvoSeries(vulns: Vulnerability[]) {
-  const labels: string[] = [];
-  const series = [
-    { key: "critical", label: "Critical", color: "var(--sev-critical)", values: [] as number[] },
-    { key: "high",     label: "High",     color: "var(--sev-high)",     values: [] as number[] },
-    { key: "medium",   label: "Medium",   color: "var(--sev-medium)",   values: [] as number[] },
-    { key: "low",      label: "Low",      color: "var(--sev-low)",      values: [] as number[] },
-  ];
-
-  for (let i = 13; i >= 0; i--) {
-    const date = subDays(new Date(), i);
+function buildEvoData(vulns: Vulnerability[]) {
+  return Array.from({ length: 14 }, (_, i) => {
+    const date = subDays(new Date(), 13 - i);
     const dateStr = format(date, "yyyy-MM-dd");
-    labels.push(format(date, "MMM d"));
-    const seen = vulns.filter(v => v.first_seen_at?.slice(0, 10) <= dateStr);
-    series[0].values.push(seen.filter(v => v.severity === "CRITICAL").length);
-    series[1].values.push(seen.filter(v => v.severity === "HIGH").length);
-    series[2].values.push(seen.filter(v => v.severity === "MEDIUM").length);
-    series[3].values.push(seen.filter(v => v.severity === "LOW").length);
-  }
-  return { labels, series };
+    const active = vulns.filter(v => v.first_seen_at?.slice(0, 10) === dateStr);
+    return {
+      date: format(date, "MMM d"),
+      critical: active.filter(v => v.severity === "CRITICAL").length,
+      high:     active.filter(v => v.severity === "HIGH").length,
+      medium:   active.filter(v => v.severity === "MEDIUM").length,
+      low:      active.filter(v => v.severity === "LOW").length,
+    };
+  });
+}
+
+function buildSparkValues(vulns: Vulnerability[], severity: string) {
+  return Array.from({ length: 14 }, (_, i) => {
+    const date = subDays(new Date(), 13 - i);
+    const dateStr = format(date, "yyyy-MM-dd");
+    return vulns.filter(v => v.severity === severity && v.first_seen_at?.slice(0, 10) <= dateStr).length;
+  });
 }
 
 /* ── Main page ───────────────────────────────────────────────── */
@@ -373,7 +251,11 @@ export default function OverviewPage() {
   const total    = critical + high + medium + low;
   const unfixed  = vulns.filter(v => !v.is_fixed).length;
 
-  const { labels: evoLabels, series: evoSeries } = buildEvoSeries(vulns);
+  const evoData = buildEvoData(vulns);
+  const sparkCritical = buildSparkValues(vulns, "CRITICAL");
+  const sparkHigh     = buildSparkValues(vulns, "HIGH");
+  const sparkMedium   = buildSparkValues(vulns, "MEDIUM");
+  const sparkLow      = buildSparkValues(vulns, "LOW");
 
   const SEV_ORDER: Record<string, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
   const topCves = [...vulns]
@@ -385,39 +267,10 @@ export default function OverviewPage() {
     .slice(0, 5);
 
   const kpis = [
-    {
-      eyebrow: "Total",
-      value: loading ? "—" : total,
-      label: "Vulnerabilities",
-      sub: `${projects.length} projects monitored`,
-      delta: null,
-      sparkIdx: 3,
-    },
-    {
-      eyebrow: "Critical",
-      value: loading ? "—" : critical,
-      label: "Critical open",
-      sub: "Requires immediate action",
-      delta: null,
-      kind: critical > 0 ? "up" : "flat",
-      sparkIdx: 0,
-    },
-    {
-      eyebrow: "Unfixed",
-      value: loading ? "—" : unfixed,
-      label: "Awaiting fix",
-      sub: `${vulns.length - unfixed} resolved`,
-      delta: null,
-      sparkIdx: 1,
-    },
-    {
-      eyebrow: "Scans",
-      value: loading ? "—" : projects.filter(p => p.last_scan).length,
-      label: "Projects scanned",
-      sub: "With at least one scan",
-      delta: null,
-      sparkIdx: 2,
-    },
+    { eyebrow: "Total",    value: loading ? "—" : total,    label: "Vulnerabilities",   sub: `${projects.length} projects`,  spark: [...sparkCritical.map((v,i) => v + sparkHigh[i] + sparkMedium[i] + sparkLow[i])], color: "var(--fg-muted)" },
+    { eyebrow: "Critical", value: loading ? "—" : critical, label: "Critical open",     sub: "Immediate action",             spark: sparkCritical, color: SEV_CSS.critical, alert: critical > 0 },
+    { eyebrow: "High",     value: loading ? "—" : high,     label: "High severity",     sub: `${medium} medium · ${low} low`, spark: sparkHigh,    color: SEV_CSS.high },
+    { eyebrow: "Unfixed",  value: loading ? "—" : unfixed,  label: "Awaiting fix",      sub: `${vulns.length - unfixed} resolved`, spark: sparkLow, color: "var(--fg-muted)" },
   ];
 
   const ciSnippet = `- name: "Scan with Trivy"
@@ -467,10 +320,10 @@ export default function OverviewPage() {
               {k.eyebrow}
             </div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 2 }}>
-              <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1, fontFeatureSettings: '"tnum"' }}>
+              <div style={{ fontSize: 30, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: 1, fontFeatureSettings: '"tnum"', color: k.alert ? k.color : "var(--fg)" }}>
                 {k.value}
               </div>
-              {k.kind === "up" && (
+              {k.alert && (
                 <span style={{ fontSize: 11, fontFamily: "var(--font-mono)", display: "inline-flex", alignItems: "center", gap: 3, padding: "2px 6px", borderRadius: 4, background: "oklch(0.65 0.24 22 / 0.12)", color: "var(--sev-critical)" }}>
                   <ArrowUp size={10}/>
                 </span>
@@ -480,32 +333,32 @@ export default function OverviewPage() {
               {k.label} · <span style={{ color: "var(--fg-faint)" }}>{k.sub}</span>
             </div>
             <div style={{ marginTop: 14 }}>
-              <Sparkline values={evoSeries[k.sparkIdx]?.values ?? []} color={evoSeries[k.sparkIdx]?.color ?? "var(--accent)"} width={240} height={36}/>
+              <Sparkline values={k.spark} color={k.color} width={240} height={36}/>
             </div>
           </Spotlight>
         ))}
 
-        {/* Evolution chart */}
-        <Spotlight style={{ gridColumn: "span 8" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14, gap: 12 }}>
+        {/* Evolution chart — full width */}
+        <Spotlight style={{ gridColumn: "span 12" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, gap: 12 }}>
             <div>
               <div style={{ fontSize: 13, color: "var(--fg-muted)", fontWeight: 500 }}>Vulnerability evolution</div>
               <div style={{ fontSize: 11.5, color: "var(--fg-dim)", marginTop: 2 }}>
-                Stacked by severity · {evoLabels[0]} → {evoLabels[evoLabels.length - 1]}
+                New detections per day · stacked by severity · last 14 days
               </div>
             </div>
-            <div style={{ display: "flex", gap: 12 }}>
-              {evoSeries.map(s => (
-                <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--fg-muted)" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, display: "inline-block" }}/>
-                  <span style={{ fontFamily: "var(--font-mono)" }}>{s.label}</span>
+            <div style={{ display: "flex", gap: 14 }}>
+              {(["critical","high","medium","low"] as const).map(k => (
+                <div key={k} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "var(--fg-muted)" }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 2, background: SEV_CSS[k], display: "inline-block" }}/>
+                  <span style={{ fontFamily: "var(--font-mono)", textTransform: "capitalize" }}>{k}</span>
                 </div>
               ))}
             </div>
           </div>
           {loading
-            ? <div style={{ height: 220, background: "var(--surface-2)", borderRadius: 8, animation: "shimmer 2s linear infinite", backgroundSize: "200% 100%", backgroundImage: "linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent)" }}/>
-            : <StreamGraph series={evoSeries} labels={evoLabels} height={220}/>
+            ? <div style={{ height: 240, background: "var(--surface-2)", borderRadius: 8 }}/>
+            : <EvoChart data={evoData} height={240}/>
           }
         </Spotlight>
 
@@ -515,22 +368,26 @@ export default function OverviewPage() {
             <span style={{ fontSize: 13, color: "var(--fg-muted)", fontWeight: 500 }}>By severity</span>
             <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-dim)" }}>{total} total</span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {[...evoSeries].reverse().map(s => {
-              const v = s.values[s.values.length - 1] ?? 0;
-              const pct = total ? (v / total) * 100 : 0;
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {([
+              { label: "Critical", v: critical, color: SEV_CSS.critical },
+              { label: "High",     v: high,     color: SEV_CSS.high },
+              { label: "Medium",   v: medium,   color: SEV_CSS.medium },
+              { label: "Low",      v: low,      color: SEV_CSS.low },
+            ]).map(s => {
+              const pct = total ? (s.v / total) * 100 : 0;
               return (
-                <div key={s.key} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div key={s.label} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, display: "inline-block" }}/>
                       {s.label}
                     </div>
                     <span style={{ fontFamily: "var(--font-mono)" }}>
-                      {v} <span style={{ color: "var(--fg-faint)" }}>· {pct.toFixed(0)}%</span>
+                      {s.v} <span style={{ color: "var(--fg-faint)" }}>· {pct.toFixed(0)}%</span>
                     </span>
                   </div>
-                  <div style={{ height: 6, background: "var(--surface-3)", borderRadius: 999, overflow: "hidden" }}>
+                  <div style={{ height: 5, background: "var(--surface-3)", borderRadius: 999, overflow: "hidden" }}>
                     <div style={{ width: `${pct}%`, height: "100%", background: s.color, transition: "width 600ms cubic-bezier(0.2,0.7,0.2,1)" }}/>
                   </div>
                 </div>
@@ -541,7 +398,7 @@ export default function OverviewPage() {
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <div>
               <div style={{ color: "var(--fg-dim)", fontSize: 11 }}>Unfixed</div>
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 16, fontWeight: 600, marginTop: 2 }}>{unfixed}</div>
+              <div style={{ fontFamily: "var(--font-mono)", fontSize: 16, fontWeight: 600, marginTop: 2, color: "var(--sev-critical)" }}>{unfixed}</div>
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ color: "var(--fg-dim)", fontSize: 11 }}>Fixed</div>
