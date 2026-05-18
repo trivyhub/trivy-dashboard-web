@@ -53,6 +53,7 @@ export interface Vulnerability {
   primary_url: string;
   is_fixed: boolean;
   first_seen_at: string;
+  cvss_score: number | null;
 }
 
 export interface ScanSummary {

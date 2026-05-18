@@ -156,7 +156,7 @@ export default function VulnerabilitiesPage() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--surface-2)" }}>
-                {["CVE ID", "Severity", "Package", "Installed", "Fix", "Title", "Link", "Status", "Age", "First seen"].map(h => (
+                {["CVE ID", "CVSS", "Severity", "Package", "Installed", "Fix", "Title", "Link", "Status", "Age", "First seen"].map(h => (
                   <th key={h} style={{
                     textAlign: "left", padding: "11px 14px",
                     fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em",
@@ -190,6 +190,14 @@ export default function VulnerabilitiesPage() {
                 >
                   <td style={{ padding: "12px 14px", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color: "var(--fg)", whiteSpace: "nowrap" }}>
                     {v.cve_id}
+                  </td>
+                  <td style={{ padding: "12px 14px" }}>
+                    {v.cvss_score != null
+                      ? <span style={{
+                          fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 700,
+                          color: v.cvss_score >= 9 ? "var(--sev-critical)" : v.cvss_score >= 7 ? "var(--sev-high)" : v.cvss_score >= 4 ? "var(--sev-medium)" : "var(--sev-low)",
+                        }}>{v.cvss_score.toFixed(1)}</span>
+                      : <span style={{ color: "var(--fg-faint)", fontSize: 11 }}>—</span>}
                   </td>
                   <td style={{ padding: "12px 14px" }}>
                     <SevChip level={v.severity}/>

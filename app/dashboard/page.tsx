@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { RefreshCw, Download, Play, ChevronRight, Copy, Check, GitBranch, ArrowUp } from "lucide-react";
+import { RefreshCw, Download, ChevronRight, Copy, Check, GitBranch, ArrowUp } from "lucide-react";
 import { projectsApi, vulnApi } from "@/lib/api";
 import type { Project, Vulnerability, ScanSummary } from "@/lib/types";
 import { format, subDays } from "date-fns";
@@ -53,6 +53,21 @@ function Sparkline({ values, color = "var(--accent)", width = 80, height = 28, i
   );
 }
 
+function CvssGauge({ value, size = 44 }: { value: number; size?: number }) {
+  const color = value >= 9 ? "var(--sev-critical)" : value >= 7 ? "var(--sev-high)" : value >= 4 ? "var(--sev-medium)" : "var(--sev-low)";
+  const pct = (value / 10) * 100;
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: `conic-gradient(${color} ${pct}%, var(--surface-3) 0)`,
+      display: "grid", placeItems: "center", position: "relative", flexShrink: 0,
+    }}>
+      <div style={{ position: "absolute", inset: 5, borderRadius: "50%", background: "var(--surface)" }}/>
+      <span style={{ position: "relative", fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 600, color }}>{value.toFixed(1)}</span>
+    </div>
+  );
+}
+
 function SeverityBar({ counts }: { counts: { critical: number; high: number; medium: number; low: number } }) {
   const total = counts.critical + counts.high + counts.medium + counts.low || 1;
   const segs = [
@@ -70,20 +85,6 @@ function SeverityBar({ counts }: { counts: { critical: number; high: number; med
   );
 }
 
-function CvssGauge({ value, size = 44 }: { value: number; size?: number }) {
-  const color = value >= 9 ? "var(--sev-critical)" : value >= 7 ? "var(--sev-high)" : value >= 4 ? "var(--sev-medium)" : "var(--sev-low)";
-  const pct = (value / 10) * 100;
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%",
-      background: `conic-gradient(${color} ${pct}%, var(--surface-3) 0)`,
-      display: "grid", placeItems: "center", position: "relative", flexShrink: 0,
-    }}>
-      <div style={{ position: "absolute", inset: 5, borderRadius: "50%", background: "var(--surface)" }}/>
-      <span style={{ position: "relative", fontFamily: "var(--font-mono)", fontSize: 12, fontWeight: 600, color }}>{value.toFixed(1)}</span>
-    </div>
-  );
-}
 
 /* ── Evolution chart (Recharts) ──────────────────────────────── */
 
@@ -315,9 +316,6 @@ export default function OverviewPage() {
           <button style={btnGhost}>
             <Download size={13}/> Export
           </button>
-          <button style={btnPrimary}>
-            <Play size={13}/> Run scan
-          </button>
         </div>
       </div>
 
@@ -522,7 +520,9 @@ export default function OverviewPage() {
                       onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "var(--surface-2)"}
                       onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
                     >
-                      <CvssGauge value={v.severity === "CRITICAL" ? 9.5 : v.severity === "HIGH" ? 7.5 : v.severity === "MEDIUM" ? 5 : 2.5} size={44}/>
+                      {v.cvss_score != null
+                        ? <CvssGauge value={v.cvss_score} size={40}/>
+                        : <SevChip level={v.severity}/>}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--fg)" }}>{v.cve_id}</span>
@@ -601,11 +601,3 @@ const btnGhost: React.CSSProperties = {
   fontFamily: "var(--font-sans)",
 };
 
-const btnPrimary: React.CSSProperties = {
-  display: "inline-flex", alignItems: "center", gap: 6,
-  padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 500,
-  background: "linear-gradient(180deg, oklch(0.92 0.16 130), oklch(0.78 0.18 130))",
-  color: "#08080b", border: "none", cursor: "pointer",
-  boxShadow: "0 0 0 1px oklch(0.78 0.18 130), 0 8px 24px -8px var(--accent-glow)",
-  fontFamily: "var(--font-sans)",
-};
