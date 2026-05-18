@@ -96,45 +96,79 @@ const SEV_CSS: Record<string, string> = {
 
 function EvoTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
+  // payload[i].value is the stacked cumulative — use payload[i].payload[dataKey] for raw value
+  const items = [...payload].reverse().map((p: any) => ({
+    name: p.name,
+    color: p.color,
+    value: p.payload?.[p.dataKey] ?? p.value,
+  }));
+  const total = items.reduce((s, i) => s + i.value, 0);
   return (
     <div style={{
-      background: "var(--surface-2)", border: "1px solid var(--border-strong)",
-      borderRadius: 8, padding: "10px 12px",
+      background: "#111114", border: "1px solid rgba(255,255,255,0.10)",
+      borderRadius: 8, padding: "10px 14px",
       fontSize: 11, fontFamily: "var(--font-mono)",
-      boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+      minWidth: 140,
     }}>
-      <div style={{ color: "var(--fg-dim)", marginBottom: 6, fontWeight: 500 }}>{label}</div>
-      {[...payload].reverse().map((p: any) => (
-        <div key={p.dataKey} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 3 }}>
-          <span style={{ width: 8, height: 8, borderRadius: 2, background: p.color, display: "inline-block", flexShrink: 0 }}/>
-          <span style={{ flex: 1, color: "var(--fg-muted)" }}>{p.name}</span>
-          <span style={{ color: p.color, fontWeight: 600 }}>{p.value}</span>
+      <div style={{ color: "#71717a", marginBottom: 8, fontSize: 10, letterSpacing: "0.05em" }}>{label}</div>
+      {items.map(item => (
+        <div key={item.name} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: item.color, display: "inline-block", flexShrink: 0 }}/>
+          <span style={{ flex: 1, color: "#a1a1aa" }}>{item.name}</span>
+          <span style={{ color: item.color, fontWeight: 700 }}>{item.value}</span>
         </div>
       ))}
+      {total > 0 && (
+        <>
+          <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "8px 0" }}/>
+          <div style={{ display: "flex", justifyContent: "space-between", color: "#a1a1aa" }}>
+            <span>Total</span>
+            <span style={{ fontWeight: 700, color: "#fafafa" }}>{total}</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
 function EvoChart({ data, height = 220 }: { data: Record<string, any>[]; height?: number }) {
+  // Compute max of stacked totals so YAxis domain is correct
+  const maxTotal = Math.max(...data.map(d =>
+    (d.critical ?? 0) + (d.high ?? 0) + (d.medium ?? 0) + (d.low ?? 0)
+  ), 1);
+
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <AreaChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
+      <AreaChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
         <defs>
           {(["critical","high","medium","low"] as const).map(k => (
-            <linearGradient key={k} id={`grad-${k}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stopColor={SEV_CSS[k]} stopOpacity={0.5}/>
-              <stop offset="100%" stopColor={SEV_CSS[k]} stopOpacity={0.05}/>
+            <linearGradient key={k} id={`evo-${k}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor={SEV_CSS[k]} stopOpacity={0.7}/>
+              <stop offset="100%" stopColor={SEV_CSS[k]} stopOpacity={0.2}/>
             </linearGradient>
           ))}
         </defs>
-        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.04)" strokeDasharray="4 4"/>
-        <XAxis dataKey="date" tick={{ fill: "var(--fg-faint)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
-        <YAxis tick={{ fill: "var(--fg-faint)", fontSize: 10, fontFamily: "var(--font-mono)" }} axisLine={false} tickLine={false} width={28}/>
-        <Tooltip content={<EvoTooltip/>} cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }}/>
-        <Area type="monotone" dataKey="low"      name="Low"      stackId="s" stroke={SEV_CSS.low}      strokeWidth={1.5} fill={`url(#grad-low)`}/>
-        <Area type="monotone" dataKey="medium"   name="Medium"   stackId="s" stroke={SEV_CSS.medium}   strokeWidth={1.5} fill={`url(#grad-medium)`}/>
-        <Area type="monotone" dataKey="high"     name="High"     stackId="s" stroke={SEV_CSS.high}     strokeWidth={1.5} fill={`url(#grad-high)`}/>
-        <Area type="monotone" dataKey="critical" name="Critical" stackId="s" stroke={SEV_CSS.critical} strokeWidth={1.5} fill={`url(#grad-critical)`}/>
+        <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3"/>
+        <XAxis
+          dataKey="date"
+          tick={{ fill: "#52525b", fontSize: 10, fontFamily: "monospace" }}
+          axisLine={false} tickLine={false}
+          interval="preserveStartEnd"
+        />
+        <YAxis
+          domain={[0, maxTotal]}
+          tick={{ fill: "#52525b", fontSize: 10, fontFamily: "monospace" }}
+          axisLine={false} tickLine={false}
+          width={32}
+          allowDecimals={false}
+        />
+        <Tooltip content={<EvoTooltip/>} cursor={{ stroke: "rgba(255,255,255,0.1)", strokeWidth: 1 }}/>
+        {/* Stack order: low at bottom, critical on top */}
+        <Area type="monotone" dataKey="low"      name="Low"      stackId="s" stroke={SEV_CSS.low}      strokeWidth={1.5} fill={`url(#evo-low)`}/>
+        <Area type="monotone" dataKey="medium"   name="Medium"   stackId="s" stroke={SEV_CSS.medium}   strokeWidth={1.5} fill={`url(#evo-medium)`}/>
+        <Area type="monotone" dataKey="high"     name="High"     stackId="s" stroke={SEV_CSS.high}     strokeWidth={1.5} fill={`url(#evo-high)`}/>
+        <Area type="monotone" dataKey="critical" name="Critical" stackId="s" stroke={SEV_CSS.critical} strokeWidth={1.5} fill={`url(#evo-critical)`}/>
       </AreaChart>
     </ResponsiveContainer>
   );
