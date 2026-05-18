@@ -6,7 +6,7 @@ import { projectsApi, vulnApi } from "@/lib/api";
 import type { Project, Vulnerability, ScanSummary } from "@/lib/types";
 import { format, subDays } from "date-fns";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from "recharts";
 
@@ -96,70 +96,64 @@ const SEV_CSS: Record<string, string> = {
 
 function EvoTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
-  // With stacked bars, payload[i].value is the RAW value for that bar segment — correct by default
-  const items = [...payload].reverse().filter(p => p.value > 0);
-  const total = payload.reduce((s: number, p: any) => s + (p.value ?? 0), 0);
+  // Read raw values (_low, _medium, etc.) — not the pre-stacked visual values
+  const raw = payload[0]?.payload ?? {};
+  const rows = [
+    { k: "critical", label: "Critical", val: raw._critical ?? 0 },
+    { k: "high",     label: "High",     val: raw._high     ?? 0 },
+    { k: "medium",   label: "Medium",   val: raw._medium   ?? 0 },
+    { k: "low",      label: "Low",      val: raw._low      ?? 0 },
+  ];
+  const total = rows.reduce((s, r) => s + r.val, 0);
   return (
     <div style={{
       background: "#111114", border: "1px solid rgba(255,255,255,0.10)",
       borderRadius: 8, padding: "10px 14px",
       fontSize: 11, fontFamily: "var(--font-mono)",
-      boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
-      minWidth: 140,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.6)", minWidth: 140,
     }}>
       <div style={{ color: "#71717a", marginBottom: 8, fontSize: 10, letterSpacing: "0.05em" }}>{label}</div>
-      {(["critical","high","medium","low"] as const).map(k => {
-        const p = payload.find((x: any) => x.dataKey === k);
-        const val = p?.value ?? 0;
-        return (
-          <div key={k} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: SEV_CSS[k], display: "inline-block", flexShrink: 0 }}/>
-            <span style={{ flex: 1, color: "#a1a1aa", textTransform: "capitalize" }}>{k}</span>
-            <span style={{ color: val > 0 ? SEV_CSS[k] : "#52525b", fontWeight: val > 0 ? 700 : 400 }}>{val}</span>
-          </div>
-        );
-      })}
-      {total > 0 && (
-        <>
-          <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "8px 0" }}/>
-          <div style={{ display: "flex", justifyContent: "space-between", color: "#a1a1aa" }}>
-            <span>Total</span>
-            <span style={{ fontWeight: 700, color: "#fafafa" }}>{total}</span>
-          </div>
-        </>
-      )}
+      {rows.map(({ k, label: name, val }) => (
+        <div key={k} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
+          <span style={{ width: 8, height: 8, borderRadius: 2, background: SEV_CSS[k], display: "inline-block", flexShrink: 0 }}/>
+          <span style={{ flex: 1, color: "#a1a1aa" }}>{name}</span>
+          <span style={{ color: val > 0 ? SEV_CSS[k] : "#52525b", fontWeight: val > 0 ? 700 : 400 }}>{val}</span>
+        </div>
+      ))}
+      {total > 0 && <>
+        <div style={{ height: 1, background: "rgba(255,255,255,0.06)", margin: "8px 0" }}/>
+        <div style={{ display: "flex", justifyContent: "space-between", color: "#a1a1aa" }}>
+          <span>Total</span><span style={{ fontWeight: 700, color: "#fafafa" }}>{total}</span>
+        </div>
+      </>}
     </div>
   );
 }
 
 function EvoChart({ data, height = 220 }: { data: Record<string, any>[]; height?: number }) {
-  const maxTotal = Math.max(...data.map(d =>
-    (d.critical ?? 0) + (d.high ?? 0) + (d.medium ?? 0) + (d.low ?? 0)
-  ), 1);
+  const maxTotal = Math.max(...data.map(d => d.critical ?? 0), 1);
 
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }} barCategoryGap="20%">
+      <AreaChart data={data} margin={{ top: 8, right: 4, left: -8, bottom: 0 }}>
+        <defs>
+          {(["critical","high","medium","low"] as const).map(k => (
+            <linearGradient key={k} id={`eg-${k}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stopColor={SEV_CSS[k]} stopOpacity={0.6}/>
+              <stop offset="100%" stopColor={SEV_CSS[k]} stopOpacity={0.08}/>
+            </linearGradient>
+          ))}
+        </defs>
         <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3"/>
-        <XAxis
-          dataKey="date"
-          tick={{ fill: "#52525b", fontSize: 10, fontFamily: "monospace" }}
-          axisLine={false} tickLine={false}
-          interval="preserveStartEnd"
-        />
-        <YAxis
-          domain={[0, maxTotal]}
-          tick={{ fill: "#52525b", fontSize: 10, fontFamily: "monospace" }}
-          axisLine={false} tickLine={false}
-          width={32}
-          allowDecimals={false}
-        />
-        <Tooltip content={<EvoTooltip/>} cursor={{ fill: "rgba(255,255,255,0.04)" }}/>
-        <Bar dataKey="low"      name="Low"      stackId="s" fill={SEV_CSS.low}      fillOpacity={0.85} isAnimationActive={false}/>
-        <Bar dataKey="medium"   name="Medium"   stackId="s" fill={SEV_CSS.medium}   fillOpacity={0.85} isAnimationActive={false}/>
-        <Bar dataKey="high"     name="High"     stackId="s" fill={SEV_CSS.high}     fillOpacity={0.85} isAnimationActive={false}/>
-        <Bar dataKey="critical" name="Critical" stackId="s" fill={SEV_CSS.critical} fillOpacity={0.85} isAnimationActive={false} radius={[3, 3, 0, 0]}/>
-      </BarChart>
+        <XAxis dataKey="date" tick={{ fill: "#52525b", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
+        <YAxis domain={[0, maxTotal]} tick={{ fill: "#52525b", fontSize: 10, fontFamily: "monospace" }} axisLine={false} tickLine={false} width={32} allowDecimals={false}/>
+        <Tooltip content={<EvoTooltip/>} cursor={{ stroke: "rgba(255,255,255,0.08)", strokeWidth: 1 }}/>
+        {/* Draw from bottom up: low first (smallest stack), critical last (top) */}
+        <Area type="monotone" dataKey="low"      stroke={SEV_CSS.low}      strokeWidth={1.5} fill={`url(#eg-low)`}      dot={false} isAnimationActive={false} activeDot={{ r: 3, fill: SEV_CSS.low }}/>
+        <Area type="monotone" dataKey="medium"   stroke={SEV_CSS.medium}   strokeWidth={1.5} fill={`url(#eg-medium)`}   dot={false} isAnimationActive={false} activeDot={{ r: 3, fill: SEV_CSS.medium }}/>
+        <Area type="monotone" dataKey="high"     stroke={SEV_CSS.high}     strokeWidth={1.5} fill={`url(#eg-high)`}     dot={false} isAnimationActive={false} activeDot={{ r: 3, fill: SEV_CSS.high }}/>
+        <Area type="monotone" dataKey="critical" stroke={SEV_CSS.critical} strokeWidth={1.5} fill={`url(#eg-critical)`} dot={false} isAnimationActive={false} activeDot={{ r: 3, fill: SEV_CSS.critical }}/>
+      </AreaChart>
     </ResponsiveContainer>
   );
 }
@@ -233,39 +227,34 @@ function CopyButton({ text }: { text: string }) {
 /* ── Build chart data from scans ─────────────────────────────── */
 
 function buildEvoData(allScans: ScanSummary[]) {
-  // One point per day: take the most recent scan of any project for that day,
-  // or interpolate from the last known scan.
   const days = Array.from({ length: 14 }, (_, i) => subDays(new Date(), 13 - i));
-
-  // Sort scans oldest→newest
   const sorted = [...allScans].sort((a, b) =>
     new Date(a.scanned_at).getTime() - new Date(b.scanned_at).getTime()
   );
-
-  // For each project, track last known scan counts
   const lastKnown: Record<number, ScanSummary> = {};
   let scanIdx = 0;
 
   return days.map(day => {
     const dayEnd = format(day, "yyyy-MM-dd");
-
-    // Consume all scans up to end of this day
-    while (scanIdx < sorted.length) {
-      const s = sorted[scanIdx];
-      if (s.scanned_at.slice(0, 10) <= dayEnd) {
-        lastKnown[s.project_id] = s;
-        scanIdx++;
-      } else break;
+    while (scanIdx < sorted.length && sorted[scanIdx].scanned_at.slice(0, 10) <= dayEnd) {
+      lastKnown[sorted[scanIdx].project_id] = sorted[scanIdx];
+      scanIdx++;
     }
-
-    // Sum across all projects with known state
     const vals = Object.values(lastKnown);
+    const low      = vals.reduce((s, v) => s + v.low, 0);
+    const medium   = vals.reduce((s, v) => s + v.medium, 0);
+    const high     = vals.reduce((s, v) => s + v.high, 0);
+    const critical = vals.reduce((s, v) => s + v.critical, 0);
+    // Pre-stack: each series stores its cumulative top so Area without stackId draws correctly
     return {
       date: format(day, "MMM d"),
-      critical: vals.reduce((s, v) => s + v.critical, 0),
-      high:     vals.reduce((s, v) => s + v.high, 0),
-      medium:   vals.reduce((s, v) => s + v.medium, 0),
-      low:      vals.reduce((s, v) => s + v.low, 0),
+      // raw values for tooltip
+      _low: low, _medium: medium, _high: high, _critical: critical,
+      // stacked tops for visual areas
+      low,
+      medium:   low + medium,
+      high:     low + medium + high,
+      critical: low + medium + high + critical,
     };
   });
 }
