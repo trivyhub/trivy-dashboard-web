@@ -1,0 +1,7 @@
+{
+  "yaml.validate": true,
+  "files.associations": {
+    "helm/**/*.yaml": "helm",
+    "helm/**/*.yml": "helm"
+  }
+}

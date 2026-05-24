@@ -1,0 +1,38 @@
+image:
+  repository: ghcr.io/ton-org/trivyhub
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  host: trivyhub.exemple.com
+  tls: false
+  tlsSecretName: ""
+
+env:
+  JWT_SECRET: "change-me-in-production"
+  DATABASE_URL: "postgresql://trivyhub:secret@postgres:5432/trivyhub"
+
+# Optionnel : déployer PostgreSQL dans le même chart
+postgres:
+  enabled: true
+  image: postgres:16-alpine
+  database: trivyhub
+  user: trivyhub
+  password: secret
+  storageSize: 5Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

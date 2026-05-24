@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trivyhub
+  namespace: trivyhub-staging
+  labels:
+    app: trivyhub
+    env: staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trivyhub
+  template:
+    metadata:
+      labels:
+        app: trivyhub
+        env: staging
+    spec:
+      containers:
+        - name: trivyhub
+          image: ghcr.io/theo-mrn/trivy-dashboard-web:stag  # updated by CI
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: trivyhub-secret
+                  key: DATABASE_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: trivyhub-secret
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /api/healthz
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: trivyhub
+  namespace: trivyhub-staging
+spec:
+  selector:
+    app: trivyhub
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trivyhub
+  namespace: trivyhub-staging
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - stag.trivyhub.cluster.afflair.app
+      secretName: trivyhub-staging-tls
+  rules:
+    - host: stag.trivyhub.cluster.afflair.app
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trivyhub
+                port:
+                  number: 3000

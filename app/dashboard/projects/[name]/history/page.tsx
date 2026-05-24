@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ExternalLink, ChevronDown, ChevronRight } from "lucide-react";
+import { ExternalLink, ChevronDown, ChevronRight, GitBranch, GitCommit, User } from "lucide-react";
 import { projectsApi } from "@/lib/api";
 import type { ScanSummary, Vulnerability } from "@/lib/types";
 import { format } from "date-fns";
@@ -44,17 +44,40 @@ function ScanRow({ scan, index }: { scan: ScanSummary; index: number }) {
             {isLatest && <span style={{ fontSize: 10, padding: "1px 6px", borderRadius: 4, background: "oklch(0.86 0.18 130 / 0.12)", color: "var(--accent)", fontFamily: "var(--font-mono)" }}>latest</span>}
           </div>
         </td>
-        <td style={{ padding: "12px 14px" }}>
-          {scan.pipeline_id ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={e => e.stopPropagation()}>
-              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, padding: "2px 8px", background: "var(--surface-3)", borderRadius: 6, color: "var(--fg-dim)" }}>#{scan.pipeline_id}</span>
-              {scan.pipeline_url && (
-                <a href={scan.pipeline_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-faint)", display: "flex" }}>
-                  <ExternalLink size={12}/>
-                </a>
-              )}
-            </div>
-          ) : <span style={{ fontSize: 11, color: "var(--fg-faint)" }}>—</span>}
+        <td style={{ padding: "12px 14px" }} onClick={e => e.stopPropagation()}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            {scan.branch && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <GitBranch size={10} style={{ color: "var(--fg-faint)", flexShrink: 0 }}/>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-dim)" }}>{scan.branch}</span>
+              </div>
+            )}
+            {scan.commit && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <GitCommit size={10} style={{ color: "var(--fg-faint)", flexShrink: 0 }}/>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-dim)" }}>{scan.commit.slice(0, 7)}</span>
+              </div>
+            )}
+            {scan.triggered_by && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <User size={10} style={{ color: "var(--fg-faint)", flexShrink: 0 }}/>
+                <span style={{ fontSize: 11, color: "var(--fg-dim)" }}>{scan.triggered_by}</span>
+              </div>
+            )}
+            {scan.pipeline_id && (
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, padding: "1px 6px", background: "var(--surface-3)", borderRadius: 4, color: "var(--fg-faint)" }}>#{scan.pipeline_id}</span>
+                {scan.pipeline_url && (
+                  <a href={scan.pipeline_url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--fg-faint)", display: "flex" }}>
+                    <ExternalLink size={10}/>
+                  </a>
+                )}
+              </div>
+            )}
+            {!scan.branch && !scan.commit && !scan.triggered_by && !scan.pipeline_id && (
+              <span style={{ fontSize: 11, color: "var(--fg-faint)" }}>—</span>
+            )}
+          </div>
         </td>
         <td style={{ padding: "12px 14px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-dim)", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{scan.image_name || "—"}</td>
         <td style={{ padding: "12px 14px", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--fg-dim)", whiteSpace: "nowrap" }}>
@@ -185,7 +208,7 @@ export default function HistoryPage() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "var(--surface-2)", borderBottom: "1px solid var(--border)" }}>
-                {["Scan", "Pipeline", "Image", "Date", "Severity", "Total"].map(h => (
+                {["Scan", "Context", "Image", "Date", "Severity", "Total"].map(h => (
                   <th key={h} style={{ textAlign: "left", padding: "11px 14px", fontSize: 11, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--fg-dim)", fontWeight: 500 }}>{h}</th>
                 ))}
               </tr>

@@ -24,6 +24,7 @@ const NAV_GROUPS = [
     label: "Account",
     items: [
       { href: "/dashboard/api-keys",        label: "API Keys",         icon: Key },
+      { href: "/dashboard/integrate",       label: "CI/CD Setup",      icon: Plug },
       { href: "/dashboard/settings",        label: "Settings",         icon: Settings },
     ],
   },
