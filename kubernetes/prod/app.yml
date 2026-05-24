@@ -29,6 +29,11 @@ spec:
                 secretKeyRef:
                   name: trivyhub-secret
                   key: DATABASE_URL
+            - name: DATABASE_PROVIDER
+              valueFrom:
+                secretKeyRef:
+                  name: trivyhub-secret
+                  key: DATABASE_PROVIDER
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -66,27 +71,22 @@ spec:
     - port: 3000
       targetPort: 3000
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: trivyhub
   namespace: trivyhub
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
-  ingressClassName: nginx
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`trivyhub.cluster.afflair.app`)
+      kind: Rule
+      middlewares:
+        - name: authelia
+          namespace: authelia
+      services:
+        - name: trivyhub
+          port: 3000
   tls:
-    - hosts:
-        - trivyhub.cluster.afflair.app
-      secretName: trivyhub-tls
-  rules:
-    - host: trivyhub.cluster.afflair.app
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: trivyhub
-                port:
-                  number: 3000
+    certResolver: letsencrypt
