@@ -158,7 +158,7 @@ export default function MembersPage() {
                     </select>
                   ) : <RoleBadge role={m.role}/>}
                 </td>
-                <td style={{ padding: "14px 16px", fontSize: 12, color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}>{format(new Date(m.created_at), "MMM d, yyyy")}</td>
+                <td style={{ padding: "14px 16px", fontSize: 12, color: "var(--fg-dim)", fontFamily: "var(--font-mono)" }}>{m.created_at ? format(new Date(m.created_at), "MMM d, yyyy") : "—"}</td>
                 {isOwner && (
                   <td style={{ padding: "14px 16px", textAlign: "right" }}>
                     {m.id !== currentUser?.id && (

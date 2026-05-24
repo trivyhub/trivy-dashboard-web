@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Organization {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users    User[]
+  projects Project[]
+  apiKeys  ApiKey[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             Int          @id @default(autoincrement())
+  organizationId Int          @map("organization_id")
+  email          String       @unique
+  passwordHash   String       @map("password_hash")
+  role           String       @default("member")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("users")
+}
+
+model Project {
+  id             Int      @id @default(autoincrement())
+  organizationId Int      @map("organization_id")
+  name           String
+  environment    String   @default("production")
+  owner          String   @default("")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  scans        Scan[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("projects")
+}
+
+model Scan {
+  id          Int      @id @default(autoincrement())
+  projectId   Int      @map("project_id")
+  imageName   String   @map("image_name")
+  imageDigest String   @default("") @map("image_digest")
+  scannedAt   DateTime @default(now()) @map("scanned_at")
+  pipelineId  String?  @map("pipeline_id")
+  pipelineUrl String?  @map("pipeline_url")
+  branch      String?
+  commit      String?
+  triggeredBy String?  @map("triggered_by")
+  rawJson     String   @default("") @map("raw_json")
+  langs       String   @default("[]")
+
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  vulnerabilities Vulnerability[]
+
+  @@index([projectId])
+  @@index([scannedAt(sort: Desc)])
+  @@map("scans")
+}
+
+model Vulnerability {
+  id               Int      @id @default(autoincrement())
+  scanId           Int      @map("scan_id")
+  cveId            String   @map("cve_id")
+  severity         String
+  packageName      String   @map("package_name")
+  installedVersion String   @default("") @map("installed_version")
+  fixedVersion     String   @default("") @map("fixed_version")
+  title            String   @default("")
+  description      String   @default("")
+  primaryUrl       String   @default("") @map("primary_url")
+  isFixed          Boolean  @default(false) @map("is_fixed")
+  firstSeenAt      DateTime @default(now()) @map("first_seen_at")
+  cvssScore        Float?   @map("cvss_score")
+
+  scan Scan @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId])
+  @@index([severity])
+  @@map("vulnerabilities")
+}
+
+model ApiKey {
+  id             Int       @id @default(autoincrement())
+  organizationId Int       @map("organization_id")
+  name           String
+  keyHash        String    @unique @map("key_hash")
+  keyPrefix      String    @map("key_prefix")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  lastUsedAt     DateTime? @map("last_used_at")
+  revoked        Boolean   @default(false)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([keyHash])
+  @@map("api_keys")
+}

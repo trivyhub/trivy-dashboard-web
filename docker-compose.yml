@@ -1,0 +1,32 @@
+services:
+  app:
+    image: ghcr.io/ton-org/trivyhub:latest
+    # build: .   # décommente pour builder localement
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_PROVIDER: postgresql
+      DATABASE_URL: postgresql://trivyhub:${POSTGRES_PASSWORD:-secret}@db:5432/trivyhub
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trivyhub
+      POSTGRES_USER: trivyhub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secret}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trivyhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
