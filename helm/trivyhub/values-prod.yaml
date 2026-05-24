@@ -1,6 +1,6 @@
 image:
   repository: ghcr.io/trivyhub/trivy-dashboard-web
-  tag: "ee9b18fcd80c9eebf1bc1e1412b0c6894eb485c8"
+  tag: "f48d7a4be1d77447d469d46fa7b5dbe441f61d38"
   pullPolicy: Always
 
 replicaCount: 2
